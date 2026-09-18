@@ -35,7 +35,9 @@ class Settings(BaseSettings):
     auth_otp_max_resends: int = Field(default=3, ge=1, le=10)
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: SecretStr | None = None
-    google_oauth_redirect_uri: str | None = "http://localhost:8000/api/v1/auth/oauth/google/callback"
+    google_oauth_redirect_uri: str | None = (
+        "http://localhost:8000/api/v1/auth/oauth/google/callback"
+    )
     apple_oauth_client_id: str | None = None
 
     llm_provider: Literal["disabled", "azure", "azure_foundry", "enabled"] = "disabled"
@@ -54,11 +56,17 @@ class Settings(BaseSettings):
     sarvam_tts_codec: str = "mp3"
     sarvam_tts_bitrate: str = "192k"
 
+    # Meta WhatsApp Cloud API (Coming Soon)
     whatsapp_access_token: SecretStr | None = None
     whatsapp_phone_number_id: str | None = None
     whatsapp_verify_token: SecretStr | None = None
     whatsapp_app_secret: SecretStr | None = None
     whatsapp_graph_api_version: str | None = None
+
+    # Telegram Bot Channel
+    telegram_bot_token: SecretStr | None = None
+    telegram_webhook_secret: SecretStr | None = None
+    telegram_bot_username: str = "PaytmOneVyapar_bot"
 
     resend_api_key: SecretStr | None = None
     resend_from_email: str = "Paytm ONE Vyapar <auth@tuboxlabs.com>"

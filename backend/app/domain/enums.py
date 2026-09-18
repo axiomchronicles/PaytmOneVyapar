@@ -43,7 +43,8 @@ class AgentRunStatus(StrEnum):
 class ChannelType(StrEnum):
     API = "API"
     FLUTTER = "FLUTTER"
-    WHATSAPP = "WHATSAPP"
+    WHATSAPP = "WHATSAPP"  # Coming soon
+    TELEGRAM = "TELEGRAM"
     VOICE = "VOICE"
 
 

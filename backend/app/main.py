@@ -20,6 +20,7 @@ from app.agents.services import (
     WorkflowServices,
 )
 from app.api.v1.router import api_router
+from app.api.v1.telegram import router as telegram_router
 from app.api.v1.websocket import RealtimeHub
 from app.api.v1.whatsapp import router as whatsapp_router
 from app.application.services.activity_service import (
@@ -30,6 +31,7 @@ from app.application.services.auth_service import (
     EmailOtpDelivery,
     MultiChannelOtpDelivery,
     OAuthTokenVerifier,
+    TelegramOtpDelivery,
     WhatsAppOtpDelivery,
 )
 from app.channels.voice.i18n import get_voice_message
@@ -49,6 +51,7 @@ from app.infrastructure.observability.tracing import configure_tracing
 from app.infrastructure.redis.client import RedisManager
 from app.integrations.email.resend import ResendEmailProvider
 from app.integrations.suppliers.mock_supplier import MockSupplierAdapter
+from app.integrations.telegram.client import TelegramBotProvider
 from app.integrations.whatsapp.meta import MetaWhatsAppProvider
 from app.ml.demand.baseline import BaselineForecaster
 
@@ -112,6 +115,23 @@ async def lifespan(app: FastAPI):
     app.state.oauth_verifier = OAuthTokenVerifier()
     app.state.provider_http_client = httpx.AsyncClient(timeout=30)
     app.state.email_provider = None
+    app.state.telegram_provider = None
+
+    telegram_delivery = None
+    if settings.telegram_bot_token:
+        telegram = TelegramBotProvider(
+            bot_token=settings.telegram_bot_token.get_secret_value(),
+            client=app.state.provider_http_client,
+        )
+        app.state.telegram_provider = telegram
+        telegram_delivery = TelegramOtpDelivery(telegram.send_text)
+        logger.info(
+            "telegram_configuration",
+            provider="telegram",
+            bot_username=settings.telegram_bot_username,
+            bot_token_present=True,
+            active_channel=True,
+        )
 
     whatsapp_delivery = None
     if all(
@@ -139,8 +159,9 @@ async def lifespan(app: FastAPI):
         app.state.email_provider = email_provider
         email_delivery = EmailOtpDelivery(email_provider.send_otp)
 
-    if whatsapp_delivery or email_delivery:
+    if telegram_delivery or whatsapp_delivery or email_delivery:
         app.state.otp_delivery = MultiChannelOtpDelivery(
+            telegram=telegram_delivery,
             whatsapp=whatsapp_delivery,
             email=email_delivery,
         )
@@ -149,6 +170,7 @@ async def lifespan(app: FastAPI):
 
     logger.info(
         "otp_configuration",
+        telegram_delivery_enabled=telegram_delivery is not None,
         whatsapp_delivery_enabled=whatsapp_delivery is not None,
         email_delivery_enabled=email_delivery is not None,
         delivery_enabled=app.state.otp_delivery is not None,
@@ -278,6 +300,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(RequestContextMiddleware)
     app.include_router(api_router)
+    app.include_router(telegram_router)
     app.include_router(whatsapp_router)
 
     @app.exception_handler(VyapaarError)

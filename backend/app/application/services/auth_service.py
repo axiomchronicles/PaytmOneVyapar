@@ -8,6 +8,7 @@ from uuid import UUID
 
 import httpx
 import jwt
+import structlog
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +41,8 @@ from app.infrastructure.db.models import (
     Store,
     User,
 )
+
+logger = structlog.get_logger()
 
 
 def normalize_phone(value: str) -> str:
@@ -78,7 +81,26 @@ class OtpDelivery(Protocol):
     async def send(self, identifier: str, otp: str, *, idempotency_key: str) -> None: ...
 
 
+class TelegramOtpDelivery:
+    """Delivers one-time passwords directly via Telegram Bot."""
+
+    def __init__(self, send_text: Callable[..., Awaitable[str]]) -> None:
+        self._send_text = send_text
+
+    async def send(self, identifier: str, otp: str, *, idempotency_key: str) -> None:
+        message = (
+            f"🔐 <b>Paytm ONE Vyapar Verification Code</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Your one-time security code is:\n\n"
+            f"👉 <code>{otp}</code> 👈\n\n"
+            f"<i>This code expires in 5 minutes. Do not share it with anyone.</i>"
+        )
+        await self._send_text(identifier, message, idempotency_key=idempotency_key)
+
+
 class WhatsAppOtpDelivery:
+    """Meta WhatsApp OTP delivery (Coming Soon)."""
+
     def __init__(self, send_text: Callable[..., Awaitable[str]]) -> None:
         self._send_text = send_text
 
@@ -102,9 +124,11 @@ class MultiChannelOtpDelivery:
     def __init__(
         self,
         *,
+        telegram: OtpDelivery | None = None,
         whatsapp: OtpDelivery | None = None,
         email: OtpDelivery | None = None,
     ) -> None:
+        self.telegram = telegram
         self.whatsapp = whatsapp
         self.email = email
 
@@ -114,12 +138,21 @@ class MultiChannelOtpDelivery:
                 await self.email.send(identifier, otp, idempotency_key=idempotency_key)
                 return
             raise OtpDeliveryUnavailableError("Email OTP delivery is not configured")
+        if self.telegram is not None:
+            try:
+                await self.telegram.send(identifier, otp, idempotency_key=idempotency_key)
+                return
+            except Exception as exc:
+                logger.warning("telegram_otp_failed", error=str(exc))
+                if self.whatsapp is None:
+                    raise
         if self.whatsapp is not None:
             await self.whatsapp.send(identifier, otp, idempotency_key=idempotency_key)
             return
         if self.email is not None:
-            # Fallback for phone when email configured and identifier looks like email
-            raise OtpDeliveryUnavailableError("WhatsApp OTP delivery is not configured")
+            raise OtpDeliveryUnavailableError(
+                "WhatsApp OTP delivery is coming soon. Please use Telegram (@PaytmOneVyapar_bot) or email."
+            )
         raise OtpDeliveryUnavailableError("OTP delivery is temporarily unavailable")
 
 
@@ -154,7 +187,9 @@ class SessionService:
             "expires_in": self.settings.auth_access_token_minutes * 60,
         }
 
-    async def refresh(self, refresh_token: str, *, device_name: str | None = None) -> dict[str, Any]:
+    async def refresh(
+        self, refresh_token: str, *, device_name: str | None = None
+    ) -> dict[str, Any]:
         row = await self.session.scalar(
             select(RefreshSession)
             .where(RefreshSession.token_hash == token_digest(refresh_token))
@@ -267,7 +302,9 @@ class OtpService:
             raise RateLimitError("OTP resend limit reached")
         if as_utc(challenge.resend_available_at) > now:
             retry_after = max(1, int((as_utc(challenge.resend_available_at) - now).total_seconds()))
-            raise RateLimitError("Please wait before requesting another code", details={"retry_after": retry_after})
+            raise RateLimitError(
+                "Please wait before requesting another code", details={"retry_after": retry_after}
+            )
         should_deliver = True
         if self.delivery is None:
             raise OtpDeliveryUnavailableError("OTP delivery is temporarily unavailable")
@@ -342,7 +379,9 @@ class OtpService:
     async def _user_for_identifier(self, identifier: str) -> User | None:
         if "@" in identifier:
             return await self.session.scalar(
-                select(User).where(func.lower(User.email) == identifier.lower(), User.is_active.is_(True))
+                select(User).where(
+                    func.lower(User.email) == identifier.lower(), User.is_active.is_(True)
+                )
             )
         merchant = await self.session.scalar(
             select(Merchant).where(
@@ -500,7 +539,9 @@ class OAuthService:
         if not id_token and code:
             secret = self.client_secret(provider)
             if not secret:
-                raise ProviderError(f"{provider.value.title()} OAuth client secret is not configured")
+                raise ProviderError(
+                    f"{provider.value.title()} OAuth client secret is not configured"
+                )
             effective_redirect = (
                 redirect_uri
                 or self.settings.google_oauth_redirect_uri
@@ -659,7 +700,11 @@ class RegistrationService:
             challenge = await self.session.scalar(
                 select(OAuthChallenge).where(OAuthChallenge.id == challenge_id).with_for_update()
             )
-            if challenge is None or challenge.verified_at is None or challenge.consumed_at is not None:
+            if (
+                challenge is None
+                or challenge.verified_at is None
+                or challenge.consumed_at is not None
+            ):
                 raise AuthenticationError("OAuth registration authorization is invalid")
             if claims.get("email") != normalized_email:
                 raise AuthenticationError("OAuth email does not match registration")

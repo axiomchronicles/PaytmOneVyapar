@@ -28,10 +28,24 @@ class VoiceProvider(Protocol):
 
 
 class WhatsAppProvider(Protocol):
+    """Meta WhatsApp Cloud API provider (Coming Soon)."""
+
     async def send_text(self, recipient: str, body: str, *, idempotency_key: str) -> str: ...
 
     async def send_approval(
         self, recipient: str, proposal: dict, *, idempotency_key: str
+    ) -> str: ...
+
+
+class TelegramProvider(Protocol):
+    """Telegram Bot API provider for interactive merchant alerts and approvals."""
+
+    async def send_text(
+        self, recipient: str, body: str, *, idempotency_key: str | None = None
+    ) -> str: ...
+
+    async def send_approval(
+        self, recipient: str, proposal: dict, *, idempotency_key: str | None = None
     ) -> str: ...
 
 

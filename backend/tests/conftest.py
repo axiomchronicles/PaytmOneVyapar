@@ -32,6 +32,8 @@ def settings() -> Settings:
         auth_approval_secret=JWT_SECRET,
         whatsapp_verify_token="verify-me",
         whatsapp_app_secret="whatsapp-test-secret",
+        telegram_bot_token="test-telegram-token",
+        telegram_webhook_secret=None,
     )
 
 
