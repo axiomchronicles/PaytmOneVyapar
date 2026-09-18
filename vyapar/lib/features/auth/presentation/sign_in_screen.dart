@@ -1,0 +1,207 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:vyapar/core/errors/app_failure.dart';
+import 'package:vyapar/design_system/backgrounds/aurora_background.dart';
+import 'package:vyapar/design_system/components/app_button.dart';
+import 'package:vyapar/design_system/components/app_text_field.dart';
+import 'package:vyapar/design_system/components/vyapar_logo.dart';
+import 'package:vyapar/design_system/icons/vyapar_icons.dart';
+import 'package:vyapar/design_system/tokens/colors.dart';
+import 'package:vyapar/design_system/tokens/spacing.dart';
+import 'package:vyapar/features/auth/providers/auth_provider.dart';
+import 'package:vyapar/l10n/app_localizations.dart';
+
+class SignInScreen extends ConsumerStatefulWidget {
+  const SignInScreen({super.key});
+
+  @override
+  ConsumerState<SignInScreen> createState() => _SignInScreenState();
+}
+
+class _SignInScreenState extends ConsumerState<SignInScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    TextInput.finishAutofillContext();
+    await ref
+        .read(authControllerProvider.notifier)
+        .signIn(email: _email.text, password: _password.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final auth = ref.watch(authControllerProvider);
+    final failure = auth.error;
+    return Scaffold(
+      body: AuroraBackground(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontal = constraints.maxWidth > 640
+                  ? (constraints.maxWidth - 560) / 2
+                  : AppSpacing.lg;
+              return AutofillGroup(
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontal,
+                    AppSpacing.lg,
+                    horizontal,
+                    AppSpacing.lg,
+                  ),
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Back',
+                          onPressed: () => context.go('/welcome'),
+                          icon: const VyaparIcon(VyaparIcons.back),
+                        ),
+                        const Expanded(child: VyaparLogo(height: 38)),
+                        IconButton(
+                          tooltip: 'Language',
+                          onPressed: () => context.push('/language'),
+                          icon: const VyaparIcon(VyaparIcons.language),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    Text(
+                      l10n.welcomeBack,
+                      style: Theme.of(context).textTheme.displaySmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      l10n.signInBody,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(color: AppColors.muted),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          AppTextField(
+                            fieldKey: const ValueKey('email_field'),
+                            controller: _email,
+                            label: l10n.emailAddress,
+                            hint: 'you@example.com',
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.username],
+                            prefixIcon: VyaparIcons.email,
+                            validator: (value) {
+                              final email = value?.trim() ?? '';
+                              return email.contains('@')
+                                  ? null
+                                  : 'Enter a valid email address';
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          AppTextField(
+                            fieldKey: const ValueKey('password_field'),
+                            controller: _password,
+                            label: l10n.password,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.password],
+                            prefixIcon: VyaparIcons.password,
+                            suffix: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Show password'
+                                  : 'Hide password',
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
+                              icon: VyaparIcon(
+                                _obscurePassword
+                                    ? VyaparIcons.hidden
+                                    : VyaparIcons.visible,
+                                size: 20,
+                              ),
+                            ),
+                            validator: (value) => (value?.isEmpty ?? true)
+                                ? 'Enter your password'
+                                : null,
+                            onSubmitted: (_) => _submit(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (failure != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _SignInError(
+                        message: failure is AppFailure
+                            ? failure.message
+                            : 'Sign in could not be completed.',
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                    PrimaryButton(
+                      key: const ValueKey('sign_in_button'),
+                      label: l10n.signIn,
+                      loading: auth.isLoading,
+                      onPressed: _submit,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'This backend currently supports secure email and password sign-in only.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SignInError extends StatelessWidget {
+  const _SignInError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    liveRegion: true,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const VyaparIcon(
+          VyaparIcons.warning,
+          color: AppColors.danger,
+          size: 20,
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            message,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.danger),
+          ),
+        ),
+      ],
+    ),
+  );
+}
