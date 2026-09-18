@@ -125,6 +125,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/analytics',
+                builder: (context, state) => const AnalyticsScreen(),
+              ),
+              GoRoute(
                 path: '/inventory',
                 builder: (context, state) => const InventoryScreen(),
               ),
@@ -192,10 +196,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           approvalId: state.uri.queryParameters['approvalId'],
           proposalId: state.uri.queryParameters['proposalId'],
         ),
-      ),
-      GoRoute(
-        path: '/analytics',
-        builder: (context, state) => const AnalyticsScreen(),
       ),
       GoRoute(
         path: '/analytics/:metric',

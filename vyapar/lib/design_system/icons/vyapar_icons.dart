@@ -36,6 +36,21 @@ abstract final class VyaparIcons {
   static const info = HugeIcons.strokeRoundedInformationCircle;
   static const telegram = HugeIcons.strokeRoundedTelegram;
   static const whatsapp = HugeIcons.strokeRoundedWhatsapp;
+  static const qrCode = HugeIcons.strokeRoundedQrCode01;
+  static const wallet = HugeIcons.strokeRoundedWallet02;
+  static const chartUp = HugeIcons.strokeRoundedChartUp;
+  static const userGroup = HugeIcons.strokeRoundedUserGroup;
+  static const truck = HugeIcons.strokeRoundedTruckDelivery;
+  static const tag = HugeIcons.strokeRoundedSaleTag01;
+  static const invoice = HugeIcons.strokeRoundedInvoice01;
+  static const bank = HugeIcons.strokeRoundedBank;
+  static const megaphone = HugeIcons.strokeRoundedMegaphone01;
+  static const location = HugeIcons.strokeRoundedLocation01;
+  static const smartphone = HugeIcons.strokeRoundedSmartPhone01;
+  static const car = HugeIcons.strokeRoundedCar01;
+  static const bulb = HugeIcons.strokeRoundedBulb;
+  static const moneyReceive = HugeIcons.strokeRoundedMoneyReceive01;
+  static const coins = HugeIcons.strokeRoundedCoins01;
 }
 
 class VyaparIcon extends StatelessWidget {
