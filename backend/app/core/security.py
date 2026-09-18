@@ -18,6 +18,10 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
 def canonical_json(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
 
@@ -35,7 +39,13 @@ def verify_password(password: str, encoded: str) -> bool:
 
 
 def create_access_token(
-    *, subject: UUID | str, merchant_id: UUID | str, secret: str, algorithm: str, ttl_minutes: int
+    *,
+    subject: UUID | str,
+    merchant_id: UUID | str,
+    secret: str,
+    algorithm: str,
+    ttl_minutes: int,
+    session_id: UUID | str | None = None,
 ) -> str:
     now = utc_now()
     claims = {
@@ -46,7 +56,37 @@ def create_access_token(
         "exp": now + timedelta(minutes=ttl_minutes),
         "jti": secrets.token_urlsafe(16),
     }
+    if session_id is not None:
+        claims["sid"] = str(session_id)
     return jwt.encode(claims, secret, algorithm=algorithm)
+
+
+def create_registration_token(
+    *,
+    challenge_id: UUID | str,
+    subject: str,
+    secret: str,
+    provider: str = "OTP",
+    ttl_minutes: int = 15,
+    email: str | None = None,
+) -> str:
+    now = utc_now()
+    claims = {
+        "sub": subject,
+        "challenge_id": str(challenge_id),
+        "provider": provider,
+        "type": "registration",
+        "iat": now,
+        "exp": now + timedelta(minutes=ttl_minutes),
+        "jti": secrets.token_urlsafe(16),
+    }
+    if email:
+        claims["email"] = email
+    return jwt.encode(claims, secret, algorithm="HS256")
+
+
+def token_digest(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
 def create_approval_token(

@@ -1,10 +1,11 @@
+import asyncio
 import time
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
+import httpx
 import structlog
-from fastapi import FastAPI, Request
-from fastapi.encoders import jsonable_encoder
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,6 +22,16 @@ from app.agents.services import (
 from app.api.v1.router import api_router
 from app.api.v1.websocket import RealtimeHub
 from app.api.v1.whatsapp import router as whatsapp_router
+from app.application.services.activity_service import (
+    DatabaseA2ARecorder,
+    DatabaseWorkflowActivityRecorder,
+)
+from app.application.services.auth_service import (
+    EmailOtpDelivery,
+    MultiChannelOtpDelivery,
+    OAuthTokenVerifier,
+    WhatsAppOtpDelivery,
+)
 from app.channels.voice.i18n import get_voice_message
 from app.channels.voice.pipeline import VoicePipeline
 from app.channels.voice.protocol import VoiceIntentType
@@ -31,11 +42,14 @@ from app.core.logging import configure_logging
 from app.domain.enums import ApprovalStatus
 from app.infrastructure.db.checkpoint import postgres_checkpointer
 from app.infrastructure.db.session import get_session_factory
+from app.infrastructure.events.realtime import RedisRealtimeBridge
 from app.infrastructure.observability.metrics import api_latency
 from app.infrastructure.observability.sentry import configure_sentry
 from app.infrastructure.observability.tracing import configure_tracing
 from app.infrastructure.redis.client import RedisManager
+from app.integrations.email.resend import ResendEmailProvider
 from app.integrations.suppliers.mock_supplier import MockSupplierAdapter
+from app.integrations.whatsapp.meta import MetaWhatsAppProvider
 from app.ml.demand.baseline import BaselineForecaster
 
 logger = structlog.get_logger()
@@ -66,6 +80,7 @@ def _wire_runtime(app: FastAPI, settings: Settings, checkpointer) -> None:
     supplier = MockSupplierAdapter(
         signing_secret=settings.a2a_signing_secret.get_secret_value(),
         buyer_agent_id=settings.a2a_agent_id,
+        message_recorder=DatabaseA2ARecorder(get_session_factory()),
     )
     app.state.mock_supplier = supplier
     authority = DatabaseApprovalAuthority(
@@ -80,6 +95,7 @@ def _wire_runtime(app: FastAPI, settings: Settings, checkpointer) -> None:
         suppliers=[supplier],
         approval_authority=authority,
         transaction_executor=executor,
+        activity_recorder=DatabaseWorkflowActivityRecorder(get_session_factory()),
     )
     app.state.workflow_runtime = WorkflowRuntime(
         build_purchase_graph(services, checkpointer=checkpointer), authority
@@ -93,7 +109,73 @@ async def lifespan(app: FastAPI):
     app.state.realtime_hub = RealtimeHub()
     app.state.voice_sessions = {}
     app.state.voice_pipeline = None
+    app.state.oauth_verifier = OAuthTokenVerifier()
+    app.state.provider_http_client = httpx.AsyncClient(timeout=30)
+    app.state.email_provider = None
+
+    whatsapp_delivery = None
+    if all(
+        [
+            settings.whatsapp_access_token,
+            settings.whatsapp_phone_number_id,
+            settings.whatsapp_graph_api_version,
+        ]
+    ):
+        whatsapp = MetaWhatsAppProvider(
+            access_token=settings.whatsapp_access_token.get_secret_value(),
+            phone_number_id=settings.whatsapp_phone_number_id,
+            graph_api_version=settings.whatsapp_graph_api_version,
+            client=app.state.provider_http_client,
+        )
+        whatsapp_delivery = WhatsAppOtpDelivery(whatsapp.send_text)
+
+    email_delivery = None
+    if settings.resend_api_key:
+        email_provider = ResendEmailProvider(
+            api_key=settings.resend_api_key.get_secret_value(),
+            from_email=settings.resend_from_email,
+            client=app.state.provider_http_client,
+        )
+        app.state.email_provider = email_provider
+        email_delivery = EmailOtpDelivery(email_provider.send_otp)
+
+    if whatsapp_delivery or email_delivery:
+        app.state.otp_delivery = MultiChannelOtpDelivery(
+            whatsapp=whatsapp_delivery,
+            email=email_delivery,
+        )
+    else:
+        app.state.otp_delivery = None
+
+    logger.info(
+        "otp_configuration",
+        whatsapp_delivery_enabled=whatsapp_delivery is not None,
+        email_delivery_enabled=email_delivery is not None,
+        delivery_enabled=app.state.otp_delivery is not None,
+    )
+    logger.info(
+        "resend_configuration",
+        provider="resend",
+        api_key_present=settings.resend_api_key is not None,
+        from_email=settings.resend_from_email,
+        enabled=email_delivery is not None,
+    )
+    logger.info(
+        "oauth_configuration",
+        google_client_id_present=bool(settings.google_oauth_client_id),
+        google_client_secret_present=bool(settings.google_oauth_client_secret),
+        apple_client_id_present=bool(settings.apple_oauth_client_id),
+    )
     if settings.sarvam_api_key:
+        logger.info(
+            "sarvam_configuration",
+            provider="sarvam",
+            credential_present=True,
+            credential_length=len(settings.sarvam_api_key.get_secret_value()),
+            credential_source="SARVAM_API_KEY",
+            stt_enabled=True,
+            tts_enabled=True,
+        )
         provider = SarvamVoiceProvider(
             api_key=settings.sarvam_api_key.get_secret_value(),
             stt_model=settings.sarvam_stt_model,
@@ -144,15 +226,33 @@ async def lifespan(app: FastAPI):
             return get_voice_message("unknown_action", session.language_code)
 
         app.state.voice_pipeline = VoicePipeline(provider, handle_voice)
-
-    if settings.app_checkpointer == "postgres":
-        async with postgres_checkpointer(settings.database_url) as checkpointer:
-            _wire_runtime(app, settings, checkpointer)
-            yield
     else:
-        _wire_runtime(app, settings, InMemorySaver())
-        yield
-    await app.state.redis.close()
+        logger.warning(
+            "sarvam_configuration",
+            provider="sarvam",
+            credential_present=False,
+            credential_length=0,
+            credential_source="SARVAM_API_KEY",
+            stt_enabled=False,
+            tts_enabled=False,
+        )
+
+    bridge = RedisRealtimeBridge(app.state.redis.client, app.state.realtime_hub)
+    bridge_task = asyncio.create_task(bridge.run(), name="redis-realtime-bridge")
+    try:
+        if settings.app_checkpointer == "postgres":
+            async with postgres_checkpointer(settings.database_url) as checkpointer:
+                _wire_runtime(app, settings, checkpointer)
+                yield
+        else:
+            _wire_runtime(app, settings, InMemorySaver())
+            yield
+    finally:
+        bridge.stop()
+        bridge_task.cancel()
+        await asyncio.gather(bridge_task, return_exceptions=True)
+        await app.state.provider_http_client.aclose()
+        await app.state.redis.close()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -205,7 +305,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "code": "VALIDATION_FAILED",
                     "message": "Request validation failed",
                     "request_id": getattr(request.state, "request_id", None),
-                    "details": {"errors": jsonable_encoder(exc.errors())},
+                    "details": {
+                        "errors": [
+                            {
+                                "loc": list(error.get("loc", ())),
+                                "msg": error.get("msg", "Invalid value"),
+                                "type": error.get("type", "validation_error"),
+                            }
+                            for error in exc.errors()
+                        ]
+                    },
+                }
+            },
+        )
+
+    @app.exception_handler(HTTPException)
+    async def handle_http_error(request: Request, exc: HTTPException) -> JSONResponse:
+        messages = {
+            401: "Authentication is required.",
+            403: "You do not have permission for this action.",
+            404: "The requested resource was not found.",
+        }
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": {
+                    "code": f"HTTP_{exc.status_code}",
+                    "message": messages.get(exc.status_code, str(exc.detail)),
+                    "request_id": getattr(request.state, "request_id", None),
+                    "details": {},
+                }
+            },
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(Exception)
+    async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("unhandled_request_error", error_type=type(exc).__name__)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "The request could not be completed.",
+                    "request_id": getattr(request.state, "request_id", None),
+                    "details": {},
                 }
             },
         )

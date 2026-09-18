@@ -28,6 +28,11 @@ class ConflictError(VyapaarError):
     status_code = 409
 
 
+class InvalidRequestError(VyapaarError):
+    code = "INVALID_REQUEST"
+    status_code = 400
+
+
 class DuplicateEventError(ConflictError):
     code = "DUPLICATE_EVENT"
 
@@ -47,6 +52,26 @@ class ProviderError(VyapaarError):
 
 class ProviderAuthenticationError(ProviderError):
     code = "PROVIDER_AUTHENTICATION_FAILED"
+
+
+class SarvamAuthenticationError(ProviderAuthenticationError):
+    code = "SARVAM_AUTHENTICATION_FAILED"
+
+    def __init__(self) -> None:
+        super().__init__("Voice service is temporarily unavailable.")
+
+
+class OtpDeliveryUnavailableError(ProviderError):
+    code = "OTP_DELIVERY_UNAVAILABLE"
+    status_code = 503
+
+
+class InvalidOtpError(AuthenticationError):
+    code = "OTP_VERIFICATION_FAILED"
+
+
+class OAuthCredentialError(AuthenticationError):
+    code = "OAUTH_CREDENTIAL_INVALID"
 
 
 class ProviderTimeoutError(ProviderError):

@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,7 +26,17 @@ class Settings(BaseSettings):
     auth_approval_secret: SecretStr = SecretStr("development-approval-secret-change-me")
     auth_jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
     auth_access_token_minutes: int = Field(default=30, ge=1)
+    auth_refresh_token_days: int = Field(default=30, ge=1, le=365)
     auth_approval_token_minutes: int = Field(default=10, ge=1, le=60)
+    auth_otp_secret: SecretStr = SecretStr("development-otp-secret-change-me-32")
+    auth_otp_expiry_minutes: int = Field(default=5, ge=1, le=15)
+    auth_otp_resend_seconds: int = Field(default=45, ge=15, le=300)
+    auth_otp_max_attempts: int = Field(default=5, ge=3, le=10)
+    auth_otp_max_resends: int = Field(default=3, ge=1, le=10)
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: SecretStr | None = None
+    google_oauth_redirect_uri: str | None = "http://localhost:8000/api/v1/auth/oauth/google/callback"
+    apple_oauth_client_id: str | None = None
 
     llm_provider: Literal["disabled", "azure", "azure_foundry", "enabled"] = "disabled"
     llm_model: str | None = None
@@ -50,6 +60,9 @@ class Settings(BaseSettings):
     whatsapp_app_secret: SecretStr | None = None
     whatsapp_graph_api_version: str | None = None
 
+    resend_api_key: SecretStr | None = None
+    resend_from_email: str = "Paytm ONE Vyapar <auth@tuboxlabs.com>"
+
     telemetry_enabled: bool = False
     telemetry_otlp_endpoint: str | None = None
     sentry_dsn: SecretStr | None = None
@@ -66,6 +79,14 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.app_cors_origins.split(",") if origin.strip()]
 
+    @field_validator("sarvam_api_key", mode="before")
+    @classmethod
+    def normalize_sarvam_key(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().strip('"').strip("'").strip()
+            return normalized or None
+        return value
+
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":
         if self.app_env != "production":
@@ -73,6 +94,7 @@ class Settings(BaseSettings):
         jwt_secret = self.auth_jwt_secret.get_secret_value()
         approval_secret = self.auth_approval_secret.get_secret_value()
         a2a_secret = self.a2a_signing_secret.get_secret_value()
+        otp_secret = self.auth_otp_secret.get_secret_value()
         if len(jwt_secret) < 32 or jwt_secret.startswith("development-"):
             raise ValueError("AUTH_JWT_SECRET must contain at least 32 characters in production")
         if len(approval_secret) < 32 or approval_secret.startswith("development-"):
@@ -81,6 +103,8 @@ class Settings(BaseSettings):
             )
         if len(a2a_secret) < 32 or a2a_secret.startswith("development-"):
             raise ValueError("A2A_SIGNING_SECRET must contain at least 32 characters in production")
+        if len(otp_secret) < 32 or otp_secret.startswith("development-"):
+            raise ValueError("AUTH_OTP_SECRET must contain at least 32 characters in production")
         if not self.database_url.startswith("postgresql+"):
             raise ValueError("DATABASE_URL must use an async PostgreSQL driver in production")
         if self.app_checkpointer != "postgres":
