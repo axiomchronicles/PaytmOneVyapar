@@ -1,0 +1,1 @@
+"""Merchant interaction channels."""
