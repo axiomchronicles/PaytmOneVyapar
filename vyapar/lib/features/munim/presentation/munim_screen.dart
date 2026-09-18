@@ -60,7 +60,7 @@ class MunimScreen extends ConsumerWidget {
         const SliverSection(child: SectionHeader(title: 'Needs attention')),
         const SliverSection(child: SizedBox(height: AppSpacing.xs)),
         if (isLoading)
-          const SliverSection(child: LoadingSkeleton(rows: 3))
+          const SliverSection(child: ListSkeleton(rows: 3))
         else if (inventory.hasError || recommendations.hasError)
           SliverSection(
             child: AppErrorState(

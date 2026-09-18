@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:vyapar/core/networking/json.dart';
 
 class ProposalDetail {
@@ -19,9 +20,9 @@ class ProposalDetail {
     storeId: jsonString(json['store_id'], 'store_id'),
     supplierId: jsonString(json['supplier_id'], 'supplier_id'),
     sku: jsonString(json['sku'], 'sku'),
-    quantity: jsonNumber(json['quantity'], 'quantity').toDouble(),
+    quantity: Decimal.parse(json['quantity'].toString()),
     unit: jsonString(json['unit'], 'unit'),
-    unitPrice: jsonNumber(json['unit_price'], 'unit_price').toDouble(),
+    unitPrice: Decimal.parse(json['unit_price'].toString()),
     currency: jsonString(json['currency'], 'currency'),
     deliveryAt: DateTime.parse(jsonString(json['delivery_at'], 'delivery_at')),
     quoteId: jsonString(json['quote_id'], 'quote_id'),
@@ -31,14 +32,14 @@ class ProposalDetail {
   final String storeId;
   final String supplierId;
   final String sku;
-  final double quantity;
+  final Decimal quantity;
   final String unit;
-  final double unitPrice;
+  final Decimal unitPrice;
   final String currency;
   final DateTime deliveryAt;
   final String quoteId;
 
-  double get totalAmount => quantity * unitPrice;
+  Decimal get totalAmount => quantity * unitPrice;
 }
 
 class ApprovalDetail {
@@ -50,6 +51,10 @@ class ApprovalDetail {
     required this.status,
     required this.expiresAt,
     required this.createdAt,
+    this.revision = 1,
+    this.workflowRequestId,
+    this.actionToken,
+    this.decidedAt,
   });
 
   factory ApprovalDetail.fromJson(JsonMap json) => ApprovalDetail(
@@ -60,6 +65,14 @@ class ApprovalDetail {
     status: jsonString(json['status'], 'status'),
     expiresAt: DateTime.parse(jsonString(json['expires_at'], 'expires_at')),
     createdAt: DateTime.parse(jsonString(json['created_at'], 'created_at')),
+    revision: json['revision'] == null
+        ? 1
+        : jsonNumber(json['revision'], 'revision').toInt(),
+    workflowRequestId: jsonOptionalString(json['workflow_request_id']),
+    actionToken: jsonOptionalString(json['action_token']),
+    decidedAt: jsonOptionalString(json['decided_at']) == null
+        ? null
+        : DateTime.parse(jsonString(json['decided_at'], 'decided_at')),
   );
 
   final String id;
@@ -69,6 +82,10 @@ class ApprovalDetail {
   final String status;
   final DateTime expiresAt;
   final DateTime createdAt;
+  final int revision;
+  final String? workflowRequestId;
+  final String? actionToken;
+  final DateTime? decidedAt;
 
   bool get isPending => status == 'PENDING';
 }

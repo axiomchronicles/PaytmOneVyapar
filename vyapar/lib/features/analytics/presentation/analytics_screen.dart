@@ -8,6 +8,7 @@ import 'package:vyapar/design_system/icons/vyapar_icons.dart';
 import 'package:vyapar/design_system/layout/adaptive_padding.dart';
 import 'package:vyapar/design_system/tokens/colors.dart';
 import 'package:vyapar/design_system/tokens/spacing.dart';
+import 'package:vyapar/features/analytics/models/analytics_detail.dart';
 import 'package:vyapar/features/analytics/providers/analytics_provider.dart';
 import 'package:vyapar/shared/formatters/formatters.dart';
 
@@ -38,7 +39,7 @@ class AnalyticsScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: AdaptivePadding(
                 child: analytics.when(
-                  loading: () => const LoadingSkeleton(rows: 4),
+                  loading: () => const AnalyticsScreenSkeleton(),
                   error: (error, _) => AppErrorState(
                     error: error,
                     onRetry: ref
@@ -65,6 +66,18 @@ class AnalyticsScreen extends ConsumerWidget {
                             ? AppColors.warning
                             : AppColors.success,
                       ),
+                      const SizedBox(height: AppSpacing.lg),
+                      for (final metric in AnalyticsMetric.values)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('${sentenceCase(metric.name)} analytics'),
+                          trailing: const VyaparIcon(
+                            VyaparIcons.forward,
+                            size: 18,
+                          ),
+                          onTap: () =>
+                              context.push('/analytics/${metric.name}'),
+                        ),
                       const SizedBox(height: AppSpacing.sm),
                       MetricTile(
                         value: '${value.totalOrders}',

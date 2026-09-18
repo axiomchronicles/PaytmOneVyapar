@@ -18,23 +18,23 @@ Providers use Riverpod 3's direct `Provider`, `Notifier`, `AsyncNotifier`, famil
 
 A single Dio instance uses a compile-time base URL, bounded timeouts, bearer injection, UUID request IDs, and central error mapping. Only safe reads are retried, and side-effecting requests use explicit idempotency keys without automatic retries.
 
-Access tokens live in platform secure storage. Bootstrap restores the token and validates it with `/merchants/me` before exposing the authenticated shell. The backend has no refresh-token contract, so a 401 clears the session and routes to sign-in.
+Access and rotating refresh tokens live in platform secure storage. Bootstrap restores the access token and validates it with `/merchants/me`. The shared HTTP interceptor performs one synchronized refresh on a 401, retries the original request once, and clears the session only when refresh fails. OTP and OAuth verification produce either the same session contract or an explicit registration token; no credential is stored in preferences.
 
 ## Navigation
 
-`go_router` owns auth redirects, deep links, nested detail routes, and a persistent stateful shell for Home, Inventory, Munim, Orders, and More. Orders opens an ID entry/empty capability surface because the backend has no list route; successful approvals can deep-link directly to the returned order ID.
+`go_router` owns auth redirects, OTP/registration state, OAuth cancellation/success, stable entity deep links, and a persistent stateful shell for Home, Inventory, Munim, Orders, and More. Approvals, orders, suppliers, negotiations, notifications, A2A activity, history, and analytics drill-down always fetch fresh backend entities by stable ID.
 
 ## Realtime
 
-One authenticated coordinator connects to `/api/v1/ws`, decodes only `{type,data}` envelopes, and publishes typed events. Feature controllers selectively invalidate affected data and then re-fetch authoritative HTTP state. Malformed and unknown events are ignored safely. Current backend wiring prevents outbox events from reaching this socket; see `backend-contract-map.md`.
+One authenticated `RealtimeCoordinator` connects to `/api/v1/ws`. The decoder validates versioned outbox envelopes, a bounded event-ID set suppresses duplicate delivery, and `RealtimeEventRouter` maps events to targeted Riverpod invalidations. Reconnect emits a resynchronization signal before normal event handling. Backgrounding closes the shared connection; foregrounding reconnects and refetches authoritative HTTP state. Partial payloads are never used to reconstruct transactional state.
 
 ## Voice
 
-The voice controller requests microphone permission, creates a backend session, streams mono PCM16 microphone frames, consumes transcript/action/response/control events, supports interruption and lifecycle shutdown, and keeps secrets server-side. Binary TTS is buffered as a continuous utterance. Continuous PCM playback requires the backend to advertise and emit `linear16`; the current default is unframed MP3, which is recorded as a contract gap rather than decoded chunk-by-chunk.
+The voice controller requests microphone permission, creates a backend session, streams mono PCM16 microphone frames, consumes transcript/action/response/control events, supports barge-in and lifecycle shutdown, and keeps credentials server-side. `AUDIO_START` advertises codec/sample rate. Raw PCM uses a 300 ms prebuffer and continuous feed; unsupported compressed streams are never played as independent chunks.
 
 ## Rendering and performance
 
-Non-trivial pages use `CustomScrollView` and lazy slivers. Search is debounced, obsolete requests are cancellable where the API supports server queries, and provider selection limits rebuild scope. Decorative backgrounds are static `CustomPainter` shapes. There are no scrolling blur filters, nested vertical lists, or per-row looping animations.
+Non-trivial pages use `CustomScrollView` and lazy slivers. Cursor notifiers prevent duplicate page requests, preserve loaded rows on page failure, and stop at `next_cursor == null`. Search/filter values are sent to backend query contracts. Provider selection limits rebuild scope; decorative backgrounds remain low-cost static painters.
 
 ## Design system
 
@@ -42,7 +42,7 @@ The palette is derived from the supplied references: deep Paytm navy, bright cya
 
 ## Persistence and optional integrations
 
-Secure storage is used only for the access token. Local preferences hold language choice. Drift is not added because the current unpaginated, read-light API does not justify a second database or an offline synchronization model. Firebase Messaging is not initialized because there is no backend device-registration or notification payload contract.
+Secure storage is used only for access and refresh tokens. Local preferences hold language choice. PostgreSQL-backed notifications arrive through REST and the shared realtime projection; notification payloads only carry stable IDs and the destination screen refetches current state. No client database is introduced.
 
 ## Verification
 

@@ -12,19 +12,19 @@ Dio createDioClient({
   required TokenStore tokenStore,
   required FutureOr<void> Function() onUnauthorized,
 }) {
-  final dio = Dio(
-    BaseOptions(
-      baseUrl: config.apiBaseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      sendTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 20),
-      responseType: ResponseType.json,
-      headers: const {'Accept': 'application/json'},
-    ),
+  final options = BaseOptions(
+    baseUrl: config.apiBaseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    sendTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 20),
+    responseType: ResponseType.json,
+    headers: const {'Accept': 'application/json'},
   );
+  final dio = Dio(options);
+  final refreshClient = Dio(options);
   dio.interceptors.addAll([
     RequestIdInterceptor(),
-    AuthInterceptor(tokenStore, onUnauthorized),
+    AuthInterceptor(tokenStore, onUnauthorized, refreshClient),
     SafeRetryInterceptor(dio),
   ]);
   return dio;

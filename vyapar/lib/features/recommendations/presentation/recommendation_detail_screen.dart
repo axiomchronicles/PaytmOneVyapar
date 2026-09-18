@@ -32,7 +32,9 @@ class RecommendationDetailScreen extends ConsumerWidget {
     if (recommendation == null &&
         (ref.watch(recommendationControllerProvider).isLoading ||
             inventory.isLoading)) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: SafeArea(child: RecommendationDetailSkeleton()),
+      );
     }
     return Scaffold(
       body: SafeArea(

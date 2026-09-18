@@ -72,9 +72,9 @@ class _HomeHeader extends ConsumerWidget {
       subtitle: greetingFor(DateTime.now()),
       leading: const VyaparIcon(VyaparIcons.store, color: AppColors.navy),
       trailing: IconAction(
-        icon: VyaparIcons.profile,
-        label: 'Profile',
-        onPressed: () => context.push('/more/profile'),
+        icon: VyaparIcons.notification,
+        label: 'Notifications',
+        onPressed: () => context.push('/notifications'),
       ),
     );
   }
@@ -139,7 +139,7 @@ class _MetricGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = ref.watch(analyticsControllerProvider);
     if (analytics.isLoading) {
-      return const SliverSection(child: LoadingSkeleton(rows: 2));
+      return const SliverSection(child: HomeMetricGridSkeleton());
     }
     if (analytics.hasError || analytics.value == null) {
       return SliverSection(
@@ -210,6 +210,11 @@ class _QuickActions extends StatelessWidget {
             onTap: () => context.push('/recommendations'),
           ),
           _QuickAction(
+            label: 'Approvals',
+            icon: VyaparIcons.security,
+            onTap: () => context.push('/approvals'),
+          ),
+          _QuickAction(
             label: 'Analytics',
             icon: VyaparIcons.analytics,
             onTap: () => context.push('/analytics'),
@@ -254,7 +259,7 @@ class _InsightList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final recommendations = ref.watch(recommendationControllerProvider);
     return recommendations.when(
-      loading: () => const SliverSection(child: LoadingSkeleton(rows: 3)),
+      loading: () => const SliverSection(child: ListSkeleton(rows: 3)),
       error: (error, _) => SliverSection(
         child: AppErrorState(
           error: error,

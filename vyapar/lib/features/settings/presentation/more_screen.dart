@@ -36,6 +36,36 @@ class MoreScreen extends ConsumerWidget {
             onTap: () => context.push('/analytics'),
           ),
           _MoreItem(
+            icon: VyaparIcons.store,
+            title: 'Suppliers',
+            onTap: () => context.push('/suppliers'),
+          ),
+          _MoreItem(
+            icon: VyaparIcons.insight,
+            title: 'Negotiations',
+            onTap: () => context.push('/negotiations'),
+          ),
+          _MoreItem(
+            icon: VyaparIcons.security,
+            title: 'Approvals',
+            onTap: () => context.push('/approvals'),
+          ),
+          _MoreItem(
+            icon: VyaparIcons.notification,
+            title: 'Notifications',
+            onTap: () => context.push('/notifications'),
+          ),
+          _MoreItem(
+            icon: VyaparIcons.clock,
+            title: 'Business history',
+            onTap: () => context.push('/history'),
+          ),
+          _MoreItem(
+            icon: VyaparIcons.munim,
+            title: 'A2A activity',
+            onTap: () => context.push('/a2a-activity'),
+          ),
+          _MoreItem(
             icon: VyaparIcons.settings,
             title: 'Settings',
             onTap: () => context.push('/more/settings'),

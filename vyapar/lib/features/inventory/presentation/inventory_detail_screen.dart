@@ -26,7 +26,7 @@ class InventoryDetailScreen extends ConsumerWidget {
     return Scaffold(
       body: SafeArea(
         child: switch ((list.isLoading, list.hasError, item)) {
-          (true, _, _) => const Center(child: CircularProgressIndicator()),
+          (true, _, _) => const InventoryDetailSkeleton(),
           (_, true, _) => AppErrorState(
             error: list.error!,
             onRetry: ref.read(inventoryControllerProvider.notifier).refresh,

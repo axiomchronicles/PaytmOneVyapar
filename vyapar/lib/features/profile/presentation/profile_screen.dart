@@ -41,7 +41,7 @@ class ProfileScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: AdaptivePadding(
                 child: profile.when(
-                  loading: () => const LoadingSkeleton(rows: 5),
+                  loading: () => const ProfileScreenSkeleton(),
                   error: (error, _) => AppErrorState(
                     error: error,
                     onRetry: ref

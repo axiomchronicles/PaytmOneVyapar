@@ -41,7 +41,7 @@ class OrderDetailScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: AdaptivePadding(
                 child: order.when(
-                  loading: () => const LoadingSkeleton(rows: 5),
+                  loading: () => const OrderDetailSkeleton(),
                   error: (error, _) => AppErrorState(
                     error: error,
                     onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
@@ -85,7 +85,23 @@ class _OrderBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         Text('Progress', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: AppSpacing.md),
-        AppTimeline(items: _timeline(order.status)),
+        AppTimeline(
+          items: order.timeline.isEmpty
+              ? [
+                  TimelineItem(
+                    title: sentenceCase(order.status),
+                    complete: true,
+                  ),
+                ]
+              : [
+                  for (final event in order.timeline)
+                    TimelineItem(
+                      title: sentenceCase(event.status),
+                      subtitle: formatDateTime(event.occurredAt),
+                      complete: true,
+                    ),
+                ],
+        ),
         if (order.supplierReference case final reference?) ...[
           const Divider(),
           const SizedBox(height: AppSpacing.md),
@@ -117,23 +133,5 @@ class _OrderBody extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  List<TimelineItem> _timeline(String status) {
-    const stages = [
-      'PROPOSED',
-      'APPROVAL_PENDING',
-      'APPROVED',
-      'EXECUTING',
-      'CONFIRMED',
-    ];
-    final index = stages.indexOf(status);
-    return [
-      for (var position = 0; position < stages.length; position++)
-        TimelineItem(
-          title: sentenceCase(stages[position]),
-          complete: index >= position || status == 'CONFIRMED',
-        ),
-    ];
   }
 }

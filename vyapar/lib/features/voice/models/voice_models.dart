@@ -20,6 +20,8 @@ class VoiceSessionInfo {
     required this.providerAvailable,
     required this.inputEncoding,
     required this.inputSampleRate,
+    required this.outputCodec,
+    required this.outputSampleRate,
   });
 
   factory VoiceSessionInfo.fromJson(JsonMap json) {
@@ -33,6 +35,17 @@ class VoiceSessionInfo {
       ),
       inputEncoding: jsonString(audio['encoding'], 'encoding'),
       inputSampleRate: jsonNumber(audio['sample_rate'], 'sample_rate').toInt(),
+      outputCodec: json['output_audio'] is Map
+          ? jsonOptionalString(jsonMap(json['output_audio'])['codec'])
+          : null,
+      outputSampleRate:
+          json['output_audio'] is! Map ||
+              jsonMap(json['output_audio'])['sample_rate'] == null
+          ? null
+          : jsonNumber(
+              jsonMap(json['output_audio'])['sample_rate'],
+              'sample_rate',
+            ).toInt(),
     );
   }
 
@@ -41,6 +54,8 @@ class VoiceSessionInfo {
   final bool providerAvailable;
   final String inputEncoding;
   final int inputSampleRate;
+  final String? outputCodec;
+  final int? outputSampleRate;
 }
 
 class VoiceState {

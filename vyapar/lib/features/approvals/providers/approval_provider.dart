@@ -1,5 +1,7 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vyapar/app/providers.dart';
+import 'package:vyapar/core/networking/cursor_page.dart';
 import 'package:vyapar/features/approvals/data/approval_repository.dart';
 import 'package:vyapar/features/approvals/models/approval_detail.dart';
 
@@ -25,6 +27,32 @@ final approvalContextsProvider =
       ApprovalContexts.new,
     );
 
+class ApprovalListController extends AsyncNotifier<CursorPage<ApprovalDetail>> {
+  @override
+  Future<CursorPage<ApprovalDetail>> build() =>
+      ref.watch(approvalRepositoryProvider).list();
+
+  Future<void> refresh() async {
+    state = await AsyncValue.guard(
+      () => ref.read(approvalRepositoryProvider).list(),
+    );
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (state.isLoading || current?.nextCursor == null) return;
+    final next = await ref
+        .read(approvalRepositoryProvider)
+        .list(cursor: current!.nextCursor);
+    state = AsyncData(current.append(next, (item) => item.id));
+  }
+}
+
+final approvalListProvider =
+    AsyncNotifierProvider<ApprovalListController, CursorPage<ApprovalDetail>>(
+      ApprovalListController.new,
+    );
+
 class ApprovalController extends AsyncNotifier<ApprovalDetail> {
   ApprovalController(this._approvalId);
 
@@ -32,12 +60,25 @@ class ApprovalController extends AsyncNotifier<ApprovalDetail> {
 
   @override
   Future<ApprovalDetail> build() =>
-      ref.watch(approvalRepositoryProvider).get(_approvalId);
+      ref.watch(approvalRepositoryProvider).get(_approvalId).then((detail) {
+        if (detail.actionToken case final token?) {
+          ref
+              .read(approvalContextsProvider.notifier)
+              .register(
+                detail.id,
+                ApprovalActionContext(
+                  approvalToken: token,
+                  requestId: detail.workflowRequestId,
+                ),
+              );
+        }
+        return detail;
+      });
 
   Future<ApprovalActionResult> decide(
     ApprovalAction action, {
-    double? quantity,
-    double? maxUnitPrice,
+    Decimal? quantity,
+    Decimal? maxUnitPrice,
   }) async {
     state = const AsyncLoading();
     try {
@@ -59,6 +100,7 @@ class ApprovalController extends AsyncNotifier<ApprovalDetail> {
       state = AsyncData(
         await ref.read(approvalRepositoryProvider).get(_approvalId),
       );
+      ref.invalidate(approvalListProvider);
       return result;
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);

@@ -29,7 +29,7 @@ flutter run \
   --dart-define=VOICE_OUTPUT_SAMPLE_RATE=24000
 ```
 
-The current backend defaults to MP3 and does not advertise output codec metadata in `AUDIO_START`; the client therefore keeps transcripts live but will not misinterpret MP3 bytes as PCM.
+The backend advertises output codec/sample rate in the session and `AUDIO_START`. The client continuously prebuffers and plays `linear16`; when the backend emits MP3 it keeps transcript/control state live without misinterpreting compressed chunks as PCM.
 
 ## Verify
 

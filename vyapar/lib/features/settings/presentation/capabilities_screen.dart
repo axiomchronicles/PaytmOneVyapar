@@ -36,20 +36,20 @@ class CapabilitiesScreen extends StatelessWidget {
                   _Capability(
                     title: 'Connected',
                     body:
-                        'Sign-in, merchant profile, inventory, recommendation ranking, analytics, exact approvals and orders, agent runs, realtime socket, and voice sessions.',
+                        'Password and OTP auth, registration, OAuth exchange, merchant profile, inventory, approvals, orders, suppliers, negotiations, A2A activity, notifications, analytics, realtime events, and voice sessions.',
                     available: true,
                   ),
                   _Capability(
-                    title: 'Awaiting backend APIs',
+                    title: 'External configuration',
                     body:
-                        'OTP and registration, lists for approvals and orders, supplier and negotiation views, A2A history, notifications, store editing, and analytics detail.',
+                        'OTP delivery requires configured WhatsApp credentials. Google and Apple require provider client IDs and platform setup. Sarvam requires a valid subscription key.',
                     available: false,
                   ),
                   _Capability(
-                    title: 'Realtime limitation',
+                    title: 'Durable realtime',
                     body:
-                        'The authenticated socket exists, but the server does not yet bridge its Redis outbox into the merchant socket hub.',
-                    available: false,
+                        'Business changes commit with an outbox event before Redis fanout. Reconnects always refresh authoritative state.',
+                    available: true,
                   ),
                 ],
               ),

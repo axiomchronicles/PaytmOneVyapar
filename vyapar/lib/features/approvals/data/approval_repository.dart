@@ -1,6 +1,8 @@
+import 'package:decimal/decimal.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vyapar/core/networking/api_error_mapper.dart';
+import 'package:vyapar/core/networking/cursor_page.dart';
 import 'package:vyapar/core/networking/json.dart';
 import 'package:vyapar/features/approvals/models/approval_detail.dart';
 
@@ -21,12 +23,34 @@ class ApprovalRepository {
     }
   }
 
+  Future<CursorPage<ApprovalDetail>> list({
+    String? cursor,
+    String? status,
+  }) async {
+    try {
+      final response = await _dio.get<Object?>(
+        '/approvals',
+        queryParameters: {
+          'limit': 30,
+          if (cursor != null) 'cursor': cursor,
+          if (status != null) 'status': status,
+        },
+      );
+      return CursorPage.fromJson(
+        jsonMap(response.data),
+        ApprovalDetail.fromJson,
+      );
+    } catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
   Future<ApprovalActionResult> decide({
     required String approvalId,
     required ApprovalAction action,
     ApprovalActionContext? context,
-    double? quantity,
-    double? maxUnitPrice,
+    Decimal? quantity,
+    Decimal? maxUnitPrice,
   }) async {
     if (action != ApprovalAction.reject && context == null) {
       throw StateError('The exact approval token is unavailable.');
@@ -41,8 +65,8 @@ class ApprovalRepository {
       if (action != ApprovalAction.reject)
         'approval_token': context?.approvalToken,
       if (context?.requestId case final requestId?) 'request_id': requestId,
-      if (quantity != null) 'quantity': quantity,
-      if (maxUnitPrice != null) 'max_unit_price': maxUnitPrice,
+      if (quantity != null) 'quantity': quantity.toString(),
+      if (maxUnitPrice != null) 'max_unit_price': maxUnitPrice.toString(),
     };
     try {
       final response = await _dio.post<Object?>(

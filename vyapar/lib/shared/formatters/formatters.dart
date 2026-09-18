@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:intl/intl.dart';
 
 final NumberFormat _inrWhole = NumberFormat.currency(
@@ -13,10 +14,13 @@ final NumberFormat _inrDecimal = NumberFormat.currency(
 final NumberFormat _number = NumberFormat.decimalPattern('en_IN');
 final DateFormat _dateTime = DateFormat('d MMM, h:mm a', 'en_IN');
 
-String formatInr(num value, {bool decimals = false}) =>
-    (decimals ? _inrDecimal : _inrWhole).format(value);
+num _numeric(Object value) =>
+    value is Decimal ? double.parse(value.toString()) : value as num;
 
-String formatQuantity(num value) => _number.format(value);
+String formatInr(Object value, {bool decimals = false}) =>
+    (decimals ? _inrDecimal : _inrWhole).format(_numeric(value));
+
+String formatQuantity(Object value) => _number.format(_numeric(value));
 
 String formatDateTime(DateTime value) => _dateTime.format(value.toLocal());
 

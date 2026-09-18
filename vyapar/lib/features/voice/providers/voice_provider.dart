@@ -112,7 +112,7 @@ class VoiceController extends Notifier<VoiceState> {
       state = VoiceState(
         phase: VoicePhase.listening,
         sessionId: session.sessionId,
-        playbackSupported: config.voiceOutputCodec.toLowerCase() == 'linear16',
+        playbackSupported: session.outputCodec?.toLowerCase() == 'linear16',
       );
     } catch (error) {
       await _disposeSession();
@@ -169,6 +169,11 @@ class VoiceController extends Notifier<VoiceState> {
             response: jsonOptionalString(event['text']) ?? '',
           );
         case 'AUDIO_START':
+          final metadata = event['metadata'] is Map
+              ? jsonMap(event['metadata'])
+              : const <String, Object?>{};
+          final codec = jsonOptionalString(metadata['codec']);
+          state = state.copyWith(playbackSupported: codec == 'linear16');
           if (state.playbackSupported) {
             await _player.begin();
           }

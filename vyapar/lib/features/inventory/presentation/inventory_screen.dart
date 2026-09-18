@@ -55,7 +55,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
           const SliverSection(child: SizedBox(height: AppSpacing.lg)),
           if (inventory.isLoading)
-            const SliverSection(child: LoadingSkeleton(rows: 6))
+            const SliverSection(child: ListSkeleton(rows: 6))
           else if (inventory.hasError)
             SliverFillRemaining(
               hasScrollBody: false,

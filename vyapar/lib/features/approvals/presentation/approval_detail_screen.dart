@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -44,7 +45,7 @@ class ApprovalDetailScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: AdaptivePadding(
                 child: approval.when(
-                  loading: () => const LoadingSkeleton(rows: 6),
+                  loading: () => const ApprovalDetailSkeleton(),
                   error: (error, _) => AppErrorState(
                     error: error,
                     onRetry: () =>
@@ -71,8 +72,8 @@ class _ApprovalBody extends ConsumerWidget {
     WidgetRef ref,
     ApprovalAction action,
   ) async {
-    double? quantity;
-    double? maxUnitPrice;
+    Decimal? quantity;
+    Decimal? maxUnitPrice;
     if (action == ApprovalAction.modify) {
       final modification = await showAppSheet<_ProposalModification>(
         context: context,
@@ -200,8 +201,8 @@ class _ApprovalBody extends ConsumerWidget {
 class _ProposalModification {
   const _ProposalModification({this.quantity, this.maxUnitPrice});
 
-  final double? quantity;
-  final double? maxUnitPrice;
+  final Decimal? quantity;
+  final Decimal? maxUnitPrice;
 }
 
 class _ModifyProposalSheet extends StatefulWidget {
@@ -236,9 +237,12 @@ class _ModifyProposalSheetState extends State<_ModifyProposalSheet> {
   }
 
   void _submit() {
-    final quantity = double.tryParse(_quantity.text.trim());
-    final price = double.tryParse(_price.text.trim());
-    if (quantity == null || quantity <= 0 || price == null || price <= 0) {
+    final quantity = Decimal.tryParse(_quantity.text.trim());
+    final price = Decimal.tryParse(_price.text.trim());
+    if (quantity == null ||
+        quantity <= Decimal.zero ||
+        price == null ||
+        price <= Decimal.zero) {
       return;
     }
     Navigator.of(

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vyapar/app/providers.dart';
 import 'package:vyapar/features/analytics/data/analytics_repository.dart';
+import 'package:vyapar/features/analytics/models/analytics_detail.dart';
 import 'package:vyapar/features/analytics/models/analytics_overview.dart';
 
 final analyticsRepositoryProvider = Provider<AnalyticsRepository>(
@@ -22,4 +23,9 @@ class AnalyticsController extends AsyncNotifier<AnalyticsOverview> {
 final analyticsControllerProvider =
     AsyncNotifierProvider<AnalyticsController, AnalyticsOverview>(
       AnalyticsController.new,
+    );
+
+final analyticsDetailProvider = FutureProvider.autoDispose
+    .family<AnalyticsDetail, AnalyticsMetric>(
+      (ref, metric) => ref.watch(analyticsRepositoryProvider).getDetail(metric),
     );
