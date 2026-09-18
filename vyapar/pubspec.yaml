@@ -49,3 +49,9 @@ flutter:
     - assets/backgound_screen_auth.webp
     - assets/verify_otp_screen_bg.webp
     - assets/google.svg
+    - assets/hero_bg.webp
+    - assets/hero_1.webp
+    - assets/hero_2.webp
+    - assets/hero_3.webp
+    - assets/coke_crate.png
+    - assets/store_thumb.png
