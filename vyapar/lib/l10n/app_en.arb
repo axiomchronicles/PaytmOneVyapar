@@ -1,0 +1,20 @@
+{
+  "@@locale": "en",
+  "appName": "Paytm One Vyapar",
+  "welcomeTitle": "Your business, one step ahead",
+  "welcomeBody": "Inventory, procurement and your AI Munim—working together with your real business data.",
+  "getStarted": "Get started",
+  "signIn": "Sign in",
+  "welcomeBack": "Welcome back",
+  "signInBody": "Sign in to see what needs attention in your business.",
+  "emailAddress": "Email address",
+  "password": "Password",
+  "continueLabel": "Continue",
+  "retry": "Try again",
+  "refresh": "Refresh",
+  "home": "Home",
+  "inventory": "Inventory",
+  "munim": "Munim",
+  "orders": "Orders",
+  "more": "More"
+}
