@@ -249,3 +249,66 @@ async def test_multichannel_otp_delivery_routes_to_telegram() -> None:
     # Email delivery routes to Email
     await delivery.send("user@test.com", "654321", idempotency_key="idemp-2")
     mock_email.send.assert_called_once_with("user@test.com", "654321", idempotency_key="idemp-2")
+
+
+@pytest.mark.asyncio
+async def test_multichannel_otp_delivery_fallback_to_email() -> None:
+    from app.application.services.auth_service import MultiChannelOtpDelivery
+
+    mock_tg = AsyncMock()
+    mock_tg.send.side_effect = Exception("Chat not found")
+    mock_email = AsyncMock()
+    delivery = MultiChannelOtpDelivery(telegram=mock_tg, email=mock_email)
+
+    await delivery.send(
+        "9876543210",
+        "123456",
+        idempotency_key="idemp-fallback",
+        fallback_email="merchant@example.com",
+    )
+    mock_tg.send.assert_called_once()
+    mock_email.send.assert_called_once_with(
+        "merchant@example.com", "123456", idempotency_key="idemp-fallback"
+    )
+
+
+@pytest.mark.asyncio
+async def test_multichannel_otp_delivery_dev_console_fallback() -> None:
+    from app.application.services.auth_service import MultiChannelOtpDelivery
+
+    mock_tg = AsyncMock()
+    mock_tg.send.side_effect = Exception("Chat not found")
+    delivery = MultiChannelOtpDelivery(telegram=mock_tg, app_env="development")
+
+    # Should not raise exception in development mode
+    await delivery.send("9876543210", "123456", idempotency_key="idemp-dev")
+    mock_tg.send.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_multichannel_otp_delivery_prod_error() -> None:
+    import pytest
+
+    from app.application.services.auth_service import MultiChannelOtpDelivery
+    from app.core.errors import OtpDeliveryUnavailableError
+
+    mock_tg = AsyncMock()
+    mock_tg.send.side_effect = Exception("Chat not found")
+    delivery = MultiChannelOtpDelivery(telegram=mock_tg, app_env="production")
+
+    with pytest.raises(OtpDeliveryUnavailableError) as excinfo:
+        await delivery.send("9876543210", "123456", idempotency_key="idemp-prod")
+    assert "Telegram" in str(excinfo.value.message)
+
+
+def test_phone_candidates_generation() -> None:
+    from app.application.services.auth_service import phone_candidates
+
+    candidates = phone_candidates("9811223344")
+    assert "9811223344" in candidates
+    assert "919811223344" in candidates
+    assert "+919811223344" in candidates
+
+    candidates_with_plus = phone_candidates("+919811223344")
+    assert "9811223344" in candidates_with_plus
+    assert "+919811223344" in candidates_with_plus

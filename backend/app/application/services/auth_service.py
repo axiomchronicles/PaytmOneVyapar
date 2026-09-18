@@ -64,6 +64,20 @@ def normalize_identifier(value: str) -> str:
     return normalize_phone(val)
 
 
+def phone_candidates(identifier: str) -> list[str]:
+    """Generate candidate phone representations (with/without +91, 91 prefix)."""
+    clean = "".join(c for c in identifier if c.isdigit() or c == "+")
+    candidates = [clean]
+    digits_only = "".join(c for c in clean if c.isdigit())
+    if clean.startswith("+91"):
+        candidates.extend([clean[3:], clean[1:], f"91{clean[3:]}"])
+    elif clean.startswith("91") and len(clean) >= 12:
+        candidates.extend([clean[2:], f"+{clean}", f"+91{clean[2:]}"])
+    elif len(digits_only) == 10:
+        candidates.extend([f"91{digits_only}", f"+91{digits_only}"])
+    return list(dict.fromkeys(candidates))
+
+
 def mask_phone(value: str) -> str:
     if "@" in value:
         parts = value.split("@", 1)
@@ -127,33 +141,76 @@ class MultiChannelOtpDelivery:
         telegram: OtpDelivery | None = None,
         whatsapp: OtpDelivery | None = None,
         email: OtpDelivery | None = None,
+        app_env: str = "development",
     ) -> None:
         self.telegram = telegram
         self.whatsapp = whatsapp
         self.email = email
+        self.app_env = app_env
 
-    async def send(self, identifier: str, otp: str, *, idempotency_key: str) -> None:
+    async def send(
+        self,
+        identifier: str,
+        otp: str,
+        *,
+        idempotency_key: str,
+        fallback_email: str | None = None,
+    ) -> None:
         if "@" in identifier:
             if self.email is not None:
                 await self.email.send(identifier, otp, idempotency_key=idempotency_key)
                 return
+            if self.app_env in {"development", "test"}:
+                logger.info(
+                    "development_otp_fallback_console",
+                    identifier=identifier,
+                    otp=otp,
+                    note="Email delivery not configured; code available in server logs for development testing.",
+                )
+                return
             raise OtpDeliveryUnavailableError("Email OTP delivery is not configured")
+
+
         if self.telegram is not None:
             try:
                 await self.telegram.send(identifier, otp, idempotency_key=idempotency_key)
                 return
             except Exception as exc:
-                logger.warning("telegram_otp_failed", error=str(exc))
-                if self.whatsapp is None:
-                    raise
+                logger.warning("telegram_otp_failed", error=str(exc), recipient=identifier)
+                if fallback_email and self.email is not None:
+                    try:
+                        logger.info("telegram_otp_fallback_to_email", email=fallback_email)
+                        await self.email.send(fallback_email, otp, idempotency_key=idempotency_key)
+                        return
+                    except Exception as email_exc:
+                        logger.warning("fallback_email_failed", error=str(email_exc))
+
         if self.whatsapp is not None:
             await self.whatsapp.send(identifier, otp, idempotency_key=idempotency_key)
             return
-        if self.email is not None:
-            raise OtpDeliveryUnavailableError(
-                "WhatsApp OTP delivery is coming soon. Please use Telegram (@PaytmOneVyapar_bot) or email."
+
+        if fallback_email and self.email is not None:
+            try:
+                logger.info("otp_delivered_via_fallback_email", email=fallback_email)
+                await self.email.send(fallback_email, otp, idempotency_key=idempotency_key)
+                return
+            except Exception as email_exc:
+                logger.warning("fallback_email_failed", error=str(email_exc))
+
+        if self.app_env in {"development", "test"}:
+            logger.info(
+                "development_otp_fallback_console",
+                identifier=identifier,
+                otp=otp,
+                note="Telegram chat was not reachable; code available in server logs for development testing.",
             )
-        raise OtpDeliveryUnavailableError("OTP delivery is temporarily unavailable")
+            return
+
+        raise OtpDeliveryUnavailableError(
+            "This mobile number is not yet connected to Telegram bot. "
+            "Please open Telegram, start @PaytmOneVyapar_bot, send /connect <mobile>, "
+            "or sign in with your email or Google account."
+        )
 
 
 class SessionService:
@@ -285,8 +342,35 @@ class OtpService:
         )
         self.session.add(challenge)
         await self.session.flush()
+
+        delivery_target, fallback_email = await self._resolve_delivery_info(normalized)
+
+        if self.settings.app_env in {"development", "test"}:
+            logger.info(
+                "development_otp_code",
+                identifier=normalized,
+                delivery_target=delivery_target,
+                otp=otp,
+                purpose=purpose.value,
+            )
+
         if should_deliver and self.delivery is not None:
-            await self.delivery.send(normalized, otp, idempotency_key=f"otp:{challenge.id}:0")
+            import inspect
+
+            sig = inspect.signature(self.delivery.send)
+            if "fallback_email" in sig.parameters:
+                await self.delivery.send(
+                    delivery_target,
+                    otp,
+                    idempotency_key=f"otp:{challenge.id}:0",
+                    fallback_email=fallback_email,
+                )
+            else:
+                await self.delivery.send(
+                    delivery_target,
+                    otp,
+                    idempotency_key=f"otp:{challenge.id}:0",
+                )
         return challenge, should_deliver
 
     async def resend(self, challenge_id: UUID) -> OtpChallenge:
@@ -316,12 +400,34 @@ class OtpService:
         )
         challenge.resend_count += 1
         challenge.attempts = 0
-        if should_deliver and self.delivery is not None:
-            await self.delivery.send(
-                challenge.identifier,
-                otp,
-                idempotency_key=f"otp:{challenge.id}:{challenge.resend_count}",
+
+        delivery_target, fallback_email = await self._resolve_delivery_info(challenge.identifier)
+
+        if self.settings.app_env in {"development", "test"}:
+            logger.info(
+                "development_otp_code_resend",
+                identifier=challenge.identifier,
+                delivery_target=delivery_target,
+                otp=otp,
             )
+
+        if should_deliver and self.delivery is not None:
+            import inspect
+
+            sig = inspect.signature(self.delivery.send)
+            if "fallback_email" in sig.parameters:
+                await self.delivery.send(
+                    delivery_target,
+                    otp,
+                    idempotency_key=f"otp:{challenge.id}:{challenge.resend_count}",
+                    fallback_email=fallback_email,
+                )
+            else:
+                await self.delivery.send(
+                    delivery_target,
+                    otp,
+                    idempotency_key=f"otp:{challenge.id}:{challenge.resend_count}",
+                )
         return challenge
 
     async def verify(
@@ -376,6 +482,33 @@ class OtpService:
             raise InvalidOtpError("The verification code is invalid or expired")
         return row
 
+    async def _merchant_for_phone(self, identifier: str) -> Merchant | None:
+        candidates = phone_candidates(identifier)
+        return await self.session.scalar(
+            select(Merchant).where(Merchant.phone_number.in_(candidates))
+        )
+
+    async def _resolve_delivery_info(self, identifier: str) -> tuple[str, str | None]:
+        delivery_target = identifier
+        fallback_email = None
+
+        if "@" not in identifier:
+            merchant = await self._merchant_for_phone(identifier)
+            if merchant is not None:
+                user = await self.session.scalar(
+                    select(User).where(User.merchant_id == merchant.id, User.is_active.is_(True))
+                )
+                if user and user.email:
+                    fallback_email = user.email
+
+                tg_chat_id = (merchant.settings or {}).get("telegram_chat_id")
+                if tg_chat_id:
+                    delivery_target = str(tg_chat_id)
+                elif fallback_email:
+                    delivery_target = fallback_email
+
+        return delivery_target, fallback_email
+
     async def _user_for_identifier(self, identifier: str) -> User | None:
         if "@" in identifier:
             return await self.session.scalar(
@@ -383,11 +516,7 @@ class OtpService:
                     func.lower(User.email) == identifier.lower(), User.is_active.is_(True)
                 )
             )
-        merchant = await self.session.scalar(
-            select(Merchant).where(
-                or_(Merchant.phone_number == identifier, Merchant.phone_number == f"+{identifier}")
-            )
-        )
+        merchant = await self._merchant_for_phone(identifier)
         if merchant is None:
             return None
         return await self.session.scalar(

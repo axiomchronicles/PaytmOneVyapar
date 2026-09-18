@@ -164,7 +164,9 @@ async def lifespan(app: FastAPI):
             telegram=telegram_delivery,
             whatsapp=whatsapp_delivery,
             email=email_delivery,
+            app_env=settings.app_env,
         )
+
     else:
         app.state.otp_delivery = None
 
