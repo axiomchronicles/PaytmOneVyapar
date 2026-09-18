@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vyapar/core/errors/app_failure.dart';
-import 'package:vyapar/design_system/backgrounds/aurora_background.dart';
 import 'package:vyapar/design_system/components/app_button.dart';
 import 'package:vyapar/design_system/components/app_text_field.dart';
 import 'package:vyapar/design_system/components/vyapar_logo.dart';
@@ -14,7 +14,9 @@ import 'package:vyapar/features/auth/providers/auth_provider.dart';
 import 'package:vyapar/l10n/app_localizations.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
-  const SignInScreen({super.key});
+  const SignInScreen({super.key, this.redirect});
+
+  final String? redirect;
 
   @override
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
@@ -41,16 +43,34 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         .signIn(email: _email.text, password: _password.text);
   }
 
+  Future<void> _oauth(String provider) async {
+    try {
+      final registration = await ref
+          .read(oauthFlowProvider.notifier)
+          .authenticate(provider);
+      if (mounted && registration == true) context.go('/register');
+    } on Object {
+      // The provider error is rendered in this view.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final auth = ref.watch(authControllerProvider);
+    final oauth = ref.watch(oauthFlowProvider);
     final failure = auth.error;
     return Scaffold(
-      body: AuroraBackground(
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/backgound_screen_auth.webp',
+            fit: BoxFit.cover,
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
               final horizontal = constraints.maxWidth > 640
                   ? (constraints.maxWidth - 560) / 2
                   : AppSpacing.lg;
@@ -67,7 +87,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       children: [
                         IconButton(
                           tooltip: 'Back',
-                          onPressed: () => context.go('/welcome'),
+                          onPressed: () => context.go(
+                            Uri(
+                              path: '/welcome',
+                              queryParameters: widget.redirect == null
+                                  ? null
+                                  : {'redirect': widget.redirect!},
+                            ).toString(),
+                          ),
                           icon: const VyaparIcon(VyaparIcons.back),
                         ),
                         const Expanded(child: VyaparLogo(height: 38)),
@@ -157,13 +184,33 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       loading: auth.isLoading,
                       onPressed: _submit,
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'This backend currently supports secure email and password sign-in only.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+                    const SizedBox(height: AppSpacing.md),
+                    SecondaryButton(
+                      key: const ValueKey('otp_sign_in_button'),
+                      label: 'Sign in with OTP',
+                      onPressed: () => context.go('/otp'),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SecondaryButton(
+                      key: const ValueKey('google_sign_in_button'),
+                      label: 'Continue with Google',
+                      leading: SvgPicture.asset(
+                        'assets/google.svg',
+                        width: 20,
+                        height: 20,
+                      ),
+                      loading: oauth.isLoading,
+                      onPressed: () => _oauth('google'),
+                    ),
+                    if (oauth.hasError) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      _SignInError(message: oauth.error.toString()),
+                    ],
+                    AppButton(
+                      key: const ValueKey('create_account_button'),
+                      label: 'Create a business account',
+                      style: AppButtonStyle.text,
+                      onPressed: () => context.go('/otp?registration=true'),
                     ),
                   ],
                 ),
@@ -171,8 +218,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             },
           ),
         ),
-      ),
-    );
+      ],
+    ),
+  );
   }
 }
 

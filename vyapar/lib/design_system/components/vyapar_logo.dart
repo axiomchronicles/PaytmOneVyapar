@@ -10,7 +10,7 @@ class VyaparLogo extends StatelessWidget {
     image: true,
     label: 'Paytm One Vyapar',
     child: Image.asset(
-      'assets/logo.png',
+      'assets/logo.webp',
       height: height,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,

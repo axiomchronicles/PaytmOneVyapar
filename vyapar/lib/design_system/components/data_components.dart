@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:vyapar/design_system/icons/vyapar_icons.dart';
 import 'package:vyapar/design_system/tokens/colors.dart';
@@ -8,7 +9,7 @@ import 'package:vyapar/shared/formatters/formatters.dart';
 class AmountText extends StatelessWidget {
   const AmountText({required this.amount, super.key, this.label});
 
-  final num amount;
+  final Object amount;
   final String? label;
 
   @override
@@ -62,9 +63,9 @@ class ProposalSummary extends StatelessWidget {
   });
 
   final String sku;
-  final double quantity;
+  final Decimal quantity;
   final String unit;
-  final double unitPrice;
+  final Decimal unitPrice;
   final DateTime delivery;
 
   @override

@@ -36,9 +36,12 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>vyapar</string>
+				<string>com.googleusercontent.apps.706043707662-2ro6mevqfn6u5r2h85e0jppbhrs780rb</string>
 			</array>
 		</dict>
 	</array>

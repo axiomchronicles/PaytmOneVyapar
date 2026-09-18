@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:vyapar/core/errors/app_failure.dart';
 import 'package:vyapar/design_system/components/app_button.dart';
+import 'package:vyapar/design_system/components/shimmer.dart';
 import 'package:vyapar/design_system/icons/vyapar_icons.dart';
 import 'package:vyapar/design_system/tokens/colors.dart';
-import 'package:vyapar/design_system/tokens/radii.dart';
 import 'package:vyapar/design_system/tokens/spacing.dart';
+
+export 'package:vyapar/design_system/components/shimmer.dart';
 
 class EmptyState extends StatelessWidget {
   const EmptyState({
@@ -85,50 +87,12 @@ class LoadingSkeleton extends StatelessWidget {
   final int rows;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: List<Widget>.generate(
-      rows,
-      (index) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-        child: Row(
-          children: [
-            const _SkeletonBlock(width: 44, height: 44, circular: true),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  _SkeletonBlock(width: 160, height: 14),
-                  SizedBox(height: 9),
-                  _SkeletonBlock(width: 100, height: 10),
-                ],
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => VyaparShimmer(
+    child: Column(
+      children: List<Widget>.generate(
+        rows,
+        (index) => const SkeletonTile(),
       ),
-    ),
-  );
-}
-
-class _SkeletonBlock extends StatelessWidget {
-  const _SkeletonBlock({
-    required this.width,
-    required this.height,
-    this.circular = false,
-  });
-
-  final double width;
-  final double height;
-  final bool circular;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: width,
-    height: height,
-    decoration: BoxDecoration(
-      color: AppColors.outline.withValues(alpha: 0.6),
-      borderRadius: BorderRadius.circular(circular ? height : AppRadii.sm),
     ),
   );
 }
