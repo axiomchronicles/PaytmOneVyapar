@@ -10,6 +10,7 @@ from app.api.v1.business_schemas import (
     InventoryAnalyticsView,
     ProcurementAnalyticsView,
     SalesAnalyticsView,
+    SettlementView,
 )
 from app.application.services.analytics_service import AnalyticsService
 from app.core.dependencies import Principal, get_current_principal
@@ -32,6 +33,20 @@ async def overview(
             store_id=store_id,
             created_from=created_from,
             created_to=created_to,
+        )
+    )
+
+
+@router.get("/settlements", response_model=SettlementView)
+async def settlements(
+    principal: Principal = Depends(get_current_principal),
+    session: AsyncSession = Depends(get_session),
+    store_id: Annotated[UUID | None, Query()] = None,
+) -> SettlementView:
+    return SettlementView.model_validate(
+        await AnalyticsService(session).settlements(
+            principal.merchant_id,
+            store_id=store_id,
         )
     )
 

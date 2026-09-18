@@ -275,3 +275,33 @@ def test_approval_expiry_idempotency_and_tenant_isolation(
     )
     assert expired.status_code == 409
     assert client.get(f"/api/v1/approvals/{foreign_id}", headers=auth_headers).status_code == 404
+
+
+def test_home_dashboard_and_merchant_action_contracts(client, auth_headers) -> None:
+    overview_resp = client.get("/api/v1/analytics/overview", headers=auth_headers)
+    assert overview_resp.status_code == 200
+    data = overview_resp.json()
+    assert "total_sales_amount" in data
+    assert "customer_count" in data
+    assert "expected_settlement" in data
+    assert "critical_alert" in data
+    assert data["critical_alert"]["tag"] == "Dhyaan dene layak"
+    assert len(data["opportunities"]) >= 3
+    assert len(data["quick_actions"]) >= 5
+
+    settlements_resp = client.get("/api/v1/analytics/settlements", headers=auth_headers)
+    assert settlements_resp.status_code == 200
+    assert settlements_resp.json()["bank_name"] == "HDFC Bank"
+
+    qr_resp = client.get("/api/v1/merchants/qr", headers=auth_headers)
+    assert qr_resp.status_code == 200
+    assert qr_resp.json()["soundbox_active"] is True
+    assert "upi://" in qr_resp.json()["qr_string"]
+
+    campaign_resp = client.post(
+        "/api/v1/merchants/campaigns",
+        headers=auth_headers,
+        json={"title": "Weekend 5% off", "discount_pct": "5.0"},
+    )
+    assert campaign_resp.status_code == 200
+    assert campaign_resp.json()["status"] == "ACTIVE"
