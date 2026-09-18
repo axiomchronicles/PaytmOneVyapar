@@ -39,6 +39,8 @@ dependencies = [
   "sqlalchemy[asyncio]==2.0.54",
   "structlog==26.1.0",
   "uvicorn[standard]==0.53.0",
+  "pip>=26.2.1",
+  "python-telegram-bot>=22.8",
 ]
 
 [dependency-groups]
