@@ -1,0 +1,41 @@
+name: vyapar
+description: Paytm One Vyapar merchant application.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  connectivity_plus: ^7.3.1
+  cupertino_icons: ^1.0.9
+  dio: ^5.11.1
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_pcm_sound: ^3.3.3
+  flutter_riverpod: 3.1.0
+  flutter_secure_storage: ^11.2.0
+  go_router: 17.5.0
+  hugeicons: ^1.2.0
+  intl: ^0.20.2
+  record: ^7.1.1
+  shared_preferences: ^2.5.5
+  uuid: ^4.6.0
+  web_socket_channel: ^3.0.3
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_driver:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+flutter:
+  generate: true
+  uses-material-design: true
+  assets:
+    - assets/logo.png

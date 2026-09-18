@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "275844059846",
+    "project_id": "paytm-one-vyapar",
+    "storage_bucket": "paytm-one-vyapar.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:275844059846:android:ff394cc39eb765c0253dc7",
+        "android_client_info": {
+          "package_name": "com.example.vyapar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-AJqeu01T9g-BeZ9DpXQh_InQ4TWNFTY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

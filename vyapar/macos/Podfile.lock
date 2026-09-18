@@ -1,0 +1,22 @@
+PODS:
+  - flutter_pcm_sound (0.0.1):
+    - FlutterMacOS
+  - FlutterMacOS (1.0.0)
+
+DEPENDENCIES:
+  - flutter_pcm_sound (from `Flutter/ephemeral/.symlinks/plugins/flutter_pcm_sound/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+
+EXTERNAL SOURCES:
+  flutter_pcm_sound:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_pcm_sound/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+
+SPEC CHECKSUMS:
+  flutter_pcm_sound: 66c15658e17150e5578b5fc1bcd7db97b2644711
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+
+COCOAPODS: 1.17.0
