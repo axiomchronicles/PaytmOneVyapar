@@ -1,0 +1,353 @@
+from datetime import datetime
+from decimal import Decimal
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.domain.enums import ApprovalStatus, OrderStatus, TransactionStatus
+from app.infrastructure.db.base import Base, Timestamped, UUIDPrimaryKey
+
+
+class User(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "users"
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(40), default="merchant")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Merchant(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "merchants"
+
+    name: Mapped[str] = mapped_column(String(200))
+    phone_number: Mapped[str | None] = mapped_column(String(30), unique=True)
+    currency: Mapped[str] = mapped_column(String(3), default="INR")
+    spending_limit: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    settings: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class Store(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "stores"
+    __table_args__ = (UniqueConstraint("merchant_id", "name"),)
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata")
+    address: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class Product(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "products"
+    __table_args__ = (UniqueConstraint("merchant_id", "sku"),)
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    sku: Mapped[str] = mapped_column(String(100), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    unit: Mapped[str] = mapped_column(String(30))
+    category: Mapped[str | None] = mapped_column(String(100))
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class Inventory(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "inventory"
+    __table_args__ = (UniqueConstraint("store_id", "product_id"),)
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    store_id: Mapped[UUID] = mapped_column(ForeignKey("stores.id"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id"), index=True)
+    quantity_on_hand: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
+    reserved_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
+    reorder_point: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
+
+
+class InventoryEvent(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "inventory_events"
+    __table_args__ = (
+        UniqueConstraint("merchant_id", "idempotency_key"),
+        Index("ix_inventory_events_store_product_created", "store_id", "product_id", "created_at"),
+    )
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    store_id: Mapped[UUID] = mapped_column(ForeignKey("stores.id"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(50))
+    quantity_delta: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    quantity_after: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    source: Mapped[str] = mapped_column(String(50))
+    idempotency_key: Mapped[str] = mapped_column(String(128), index=True)
+    details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class Sale(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "sales"
+    __table_args__ = (Index("ix_sales_store_product_sold", "store_id", "product_id", "sold_at"),)
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    store_id: Mapped[UUID] = mapped_column(ForeignKey("stores.id"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id"), index=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    sold_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    signals: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class Supplier(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "suppliers"
+
+    merchant_id: Mapped[UUID | None] = mapped_column(ForeignKey("merchants.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    adapter_type: Mapped[str] = mapped_column(String(40), default="rest")
+    endpoint: Mapped[str | None] = mapped_column(String(500))
+    trust_score: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    configuration: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class SupplierProduct(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "supplier_products"
+    __table_args__ = (UniqueConstraint("supplier_id", "product_id"),)
+
+    supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id"), index=True)
+    supplier_sku: Mapped[str] = mapped_column(String(100), index=True)
+    available_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    lead_time_days: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class Order(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "orders"
+    __table_args__ = (
+        UniqueConstraint("merchant_id", "idempotency_key"),
+        UniqueConstraint("proposal_id"),
+        UniqueConstraint("order_hash"),
+        Index("ix_orders_merchant_status_created", "merchant_id", "status", "created_at"),
+    )
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    store_id: Mapped[UUID] = mapped_column(ForeignKey("stores.id"), index=True)
+    supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id"), index=True)
+    proposal_id: Mapped[UUID] = mapped_column(index=True)
+    approval_id: Mapped[UUID | None] = mapped_column(ForeignKey("approvals.id"), index=True)
+    order_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(40), default=OrderStatus.PROPOSED, index=True)
+    currency: Mapped[str] = mapped_column(String(3), default="INR")
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    idempotency_key: Mapped[str] = mapped_column(String(128), index=True)
+    supplier_reference: Mapped[str | None] = mapped_column(String(200))
+    failure_reason: Mapped[str | None] = mapped_column(Text)
+
+
+class OrderItem(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "order_items"
+
+    order_id: Mapped[UUID] = mapped_column(ForeignKey("orders.id"), index=True)
+    product_id: Mapped[UUID | None] = mapped_column(ForeignKey("products.id"), index=True)
+    sku: Mapped[str] = mapped_column(String(100), index=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    unit: Mapped[str] = mapped_column(String(30))
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+
+
+class Negotiation(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "negotiations"
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id"), index=True)
+    correlation_id: Mapped[UUID] = mapped_column(unique=True, index=True)
+    sku: Mapped[str] = mapped_column(String(100), index=True)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    round_count: Mapped[int] = mapped_column(Integer, default=0)
+    constraints: Mapped[dict[str, Any]] = mapped_column(JSON)
+    history: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+
+
+class AgentSession(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "agent_sessions"
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    store_id: Mapped[UUID | None] = mapped_column(ForeignKey("stores.id"), index=True)
+    thread_id: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    channel: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class AgentMessage(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "agent_messages"
+
+    session_id: Mapped[UUID] = mapped_column(ForeignKey("agent_sessions.id"), index=True)
+    role: Mapped[str] = mapped_column(String(30))
+    content: Mapped[str | None] = mapped_column(Text)
+    structured_content: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    provider_message_id: Mapped[str | None] = mapped_column(String(200), unique=True)
+
+
+class AgentRun(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "agent_runs"
+
+    session_id: Mapped[UUID] = mapped_column(ForeignKey("agent_sessions.id"), index=True)
+    request_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    trace_id: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    current_node: Mapped[str | None] = mapped_column(String(80))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+
+class Approval(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "approvals"
+    __table_args__ = (
+        UniqueConstraint("proposal_id", "order_hash"),
+        UniqueConstraint("nonce"),
+        Index("ix_approvals_merchant_status_created", "merchant_id", "status", "created_at"),
+    )
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    proposal_id: Mapped[UUID] = mapped_column(index=True)
+    workflow_request_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    order_hash: Mapped[str] = mapped_column(String(64), index=True)
+    proposal_payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(40), default=ApprovalStatus.PENDING, index=True)
+    nonce: Mapped[str] = mapped_column(String(128))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    channel: Mapped[str] = mapped_column(String(40), default="API")
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class Transaction(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "transactions"
+    __table_args__ = (
+        UniqueConstraint("order_id"),
+        UniqueConstraint("merchant_id", "idempotency_key"),
+    )
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    order_id: Mapped[UUID] = mapped_column(ForeignKey("orders.id"), index=True)
+    approval_id: Mapped[UUID] = mapped_column(ForeignKey("approvals.id"), index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    currency: Mapped[str] = mapped_column(String(3))
+    status: Mapped[str] = mapped_column(String(40), default=TransactionStatus.PENDING, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), index=True)
+    provider_reference: Mapped[str | None] = mapped_column(String(200))
+    error: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+
+class AuditLog(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "audit_logs"
+
+    merchant_id: Mapped[UUID | None] = mapped_column(ForeignKey("merchants.id"), index=True)
+    actor_type: Mapped[str] = mapped_column(String(40))
+    actor_id: Mapped[str] = mapped_column(String(200), index=True)
+    action: Mapped[str] = mapped_column(String(100), index=True)
+    resource_type: Mapped[str] = mapped_column(String(100))
+    resource_id: Mapped[str] = mapped_column(String(200), index=True)
+    trace_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
+
+
+class A2AAgent(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "a2a_agents"
+
+    name: Mapped[str] = mapped_column(String(200), unique=True)
+    endpoint: Mapped[str] = mapped_column(String(500))
+    public_key: Mapped[str | None] = mapped_column(Text)
+    shared_secret_ref: Mapped[str | None] = mapped_column(String(200))
+    allowed_intents: Mapped[list[str]] = mapped_column(JSON, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class A2AMessage(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "a2a_messages"
+    __table_args__ = (
+        UniqueConstraint("message_id"),
+        UniqueConstraint("sender_agent_id", "nonce"),
+        UniqueConstraint("idempotency_key"),
+        Index("ix_a2a_messages_correlation_created", "correlation_id", "created_at"),
+    )
+
+    message_id: Mapped[UUID] = mapped_column(index=True)
+    correlation_id: Mapped[UUID] = mapped_column(index=True)
+    trace_id: Mapped[str] = mapped_column(String(64), index=True)
+    sender_agent_id: Mapped[UUID] = mapped_column(index=True)
+    receiver_agent_id: Mapped[UUID] = mapped_column(index=True)
+    intent: Mapped[str] = mapped_column(String(80), index=True)
+    direction: Mapped[str] = mapped_column(String(20))
+    nonce: Mapped[str] = mapped_column(String(128))
+    idempotency_key: Mapped[str] = mapped_column(String(128), index=True)
+    envelope: Mapped[dict[str, Any]] = mapped_column(JSON)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class VoiceSession(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "voice_sessions"
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    agent_session_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("agent_sessions.id"), index=True
+    )
+    active_proposal_id: Mapped[UUID | None] = mapped_column(index=True)
+    language_code: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    audio_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class ChannelMessage(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "channel_messages"
+    __table_args__ = (UniqueConstraint("channel", "provider_message_id"),)
+
+    merchant_id: Mapped[UUID | None] = mapped_column(ForeignKey("merchants.id"), index=True)
+    channel: Mapped[str] = mapped_column(String(40), index=True)
+    direction: Mapped[str] = mapped_column(String(20))
+    provider_message_id: Mapped[str] = mapped_column(String(250))
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), index=True)
+    message_type: Mapped[str] = mapped_column(String(60))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+
+
+class OutboxEvent(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "outbox_events"
+
+    aggregate_type: Mapped[str] = mapped_column(String(100), index=True)
+    aggregate_id: Mapped[UUID] = mapped_column(index=True)
+    event_type: Mapped[str] = mapped_column(String(100), index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    trace_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)
+
+
+class IdempotencyKey(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "idempotency_keys"
+    __table_args__ = (UniqueConstraint("scope", "key"),)
+
+    scope: Mapped[str] = mapped_column(String(100), index=True)
+    key: Mapped[str] = mapped_column(String(128), index=True)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(30), default="PROCESSING")
+    response: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
