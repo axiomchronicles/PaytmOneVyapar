@@ -21,6 +21,7 @@ from app.agents.services import (
 from app.api.v1.router import api_router
 from app.api.v1.websocket import RealtimeHub
 from app.api.v1.whatsapp import router as whatsapp_router
+from app.channels.voice.i18n import get_voice_message
 from app.channels.voice.pipeline import VoicePipeline
 from app.channels.voice.protocol import VoiceIntentType
 from app.channels.voice.sarvam import SarvamVoiceProvider
@@ -98,6 +99,11 @@ async def lifespan(app: FastAPI):
             stt_model=settings.sarvam_stt_model,
             tts_model=settings.sarvam_tts_model,
             tts_speaker=settings.sarvam_tts_speaker,
+            tts_pace=settings.sarvam_tts_pace,
+            tts_temperature=settings.sarvam_tts_temperature,
+            tts_sample_rate=settings.sarvam_tts_sample_rate,
+            tts_codec=settings.sarvam_tts_codec,
+            tts_bitrate=settings.sarvam_tts_bitrate,
         )
 
         async def handle_voice(session, intent) -> str:
@@ -111,9 +117,7 @@ async def lifespan(app: FastAPI):
                     or not session.active_proposal_id
                     or not session.approval_token
                 ):
-                    return (
-                        "No authenticated active purchase proposal is linked to this voice session."
-                    )
+                    return get_voice_message("no_active_proposal", session.language_code)
                 action = {
                     VoiceIntentType.APPROVE_ACTIVE_PROPOSAL: ApprovalStatus.APPROVED,
                     VoiceIntentType.MODIFY_ACTIVE_PROPOSAL: ApprovalStatus.MODIFIED,
@@ -128,12 +132,16 @@ async def lifespan(app: FastAPI):
                     user_id=session.user_id,
                     expected_proposal_id=session.active_proposal_id,
                 )
-                return f"Purchase proposal {action.value.lower()}."
+                if action == ApprovalStatus.APPROVED:
+                    return get_voice_message("proposal_approved", session.language_code)
+                elif action == ApprovalStatus.MODIFIED:
+                    return get_voice_message("proposal_modified", session.language_code)
+                return get_voice_message("proposal_rejected", session.language_code)
             if intent.intent == VoiceIntentType.REQUEST_PURCHASE:
-                return "I understood the purchase request. Review the generated proposal before approval."
+                return get_voice_message("purchase_request", session.language_code)
             if intent.intent == VoiceIntentType.REPORT_LOW_STOCK:
-                return "Low inventory noted. I will check the demand forecast before proposing a purchase."
-            return "I could not map that request to a safe business action."
+                return get_voice_message("low_stock", session.language_code)
+            return get_voice_message("unknown_action", session.language_code)
 
         app.state.voice_pipeline = VoicePipeline(provider, handle_voice)
 
