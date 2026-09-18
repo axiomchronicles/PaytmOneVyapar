@@ -34,6 +34,8 @@ abstract final class VyaparIcons {
   static const visible = HugeIcons.strokeRoundedView;
   static const hidden = HugeIcons.strokeRoundedViewOff;
   static const info = HugeIcons.strokeRoundedInformationCircle;
+  static const telegram = HugeIcons.strokeRoundedTelegram;
+  static const whatsapp = HugeIcons.strokeRoundedWhatsapp;
 }
 
 class VyaparIcon extends StatelessWidget {

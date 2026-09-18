@@ -40,10 +40,16 @@ class CapabilitiesScreen extends StatelessWidget {
                     available: true,
                   ),
                   _Capability(
+                    title: 'Interactive channels',
+                    body:
+                        'Telegram channel (@PaytmOneVyapar_bot) is active for real-time replenishment alerts, OTP security codes, and one-tap purchase approvals. WhatsApp channel is coming soon.',
+                    available: true,
+                  ),
+                  _Capability(
                     title: 'External configuration',
                     body:
-                        'OTP delivery requires configured WhatsApp credentials. Google and Apple require provider client IDs and platform setup. Sarvam requires a valid subscription key.',
-                    available: false,
+                        'Telegram bot channel is fully operational. WhatsApp Business channel is coming soon. Google and Apple require provider client IDs and platform setup. Sarvam requires a valid subscription key.',
+                    available: true,
                   ),
                   _Capability(
                     title: 'Durable realtime',

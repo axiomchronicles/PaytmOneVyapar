@@ -30,6 +30,7 @@ import 'package:vyapar/features/profile/presentation/profile_screen.dart';
 import 'package:vyapar/features/recommendations/presentation/recommendation_detail_screen.dart';
 import 'package:vyapar/features/recommendations/presentation/recommendations_screen.dart';
 import 'package:vyapar/features/settings/presentation/capabilities_screen.dart';
+import 'package:vyapar/features/settings/presentation/channels_screen.dart';
 import 'package:vyapar/features/settings/presentation/language_screen.dart';
 import 'package:vyapar/features/settings/presentation/more_screen.dart';
 import 'package:vyapar/features/settings/presentation/settings_screen.dart';
@@ -249,6 +250,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/more/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/more/channels',
+        builder: (context, state) => const ChannelsScreen(),
       ),
       GoRoute(
         path: '/more/capabilities',

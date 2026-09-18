@@ -19,7 +19,7 @@ Errors use `{"error":{"code","message","request_id","details"}}`. List resources
 | POST | `/auth/oauth/{provider}/exchange` | Verifies provider ID token/JWKS, state, nonce, issuer, audience, expiry, and account link. |
 | POST | `/auth/oauth/{provider}/link` | Authenticated explicit account linking. |
 
-OTP values are Argon2-hashed and never returned or logged. Production OTP delivery uses configured Meta WhatsApp credentials. OAuth client IDs are public configuration; provider secrets never enter Flutter.
+OTP values are Argon2-hashed and never returned or logged. Production OTP delivery uses Telegram (@PaytmOneVyapar_bot) and configured Resend Email credentials. Meta WhatsApp OTP delivery is coming soon. OAuth client IDs are public configuration; provider secrets never enter Flutter.
 
 ## Merchant business contracts
 
@@ -59,8 +59,10 @@ OTP values are Argon2-hashed and never returned or logged. Production OTP delive
 | GET | `/analytics/inventory` | Category inventory-health aggregates. |
 | GET | `/analytics/procurement` | Supplier order count/spend aggregates. |
 | POST | `/voice/sessions` | Creates authenticated voice session and advertises input/output audio contracts. |
+| GET | `/channels` | Overview of interactive communication channels (Telegram active, WhatsApp coming soon, Voice active, Email active). |
+| GET | `/channels/merchant` | Authenticated merchant channel status and linked Telegram chat binding. |
 
-Meta provider webhooks remain at `/webhooks/whatsapp` and are not Flutter APIs.
+External webhooks are `/webhooks/telegram` (active bot webhook) and `/webhooks/whatsapp` (preview / coming soon) and are not direct Flutter client APIs.
 
 ## WebSockets
 

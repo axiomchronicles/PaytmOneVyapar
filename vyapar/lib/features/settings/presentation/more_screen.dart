@@ -71,6 +71,11 @@ class MoreScreen extends ConsumerWidget {
             onTap: () => context.push('/more/settings'),
           ),
           _MoreItem(
+            icon: VyaparIcons.notification,
+            title: 'Communication channels',
+            onTap: () => context.push('/more/channels'),
+          ),
+          _MoreItem(
             icon: VyaparIcons.info,
             title: 'Backend capabilities',
             onTap: () => context.push('/more/capabilities'),

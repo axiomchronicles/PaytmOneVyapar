@@ -49,14 +49,15 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => context.push('/language'),
                 ),
                 const Divider(indent: 64),
-                const ListTile(
-                  leading: VyaparIcon(
+                ListTile(
+                  leading: const VyaparIcon(
                     VyaparIcons.notification,
-                    color: AppColors.muted,
+                    color: AppColors.blue,
                   ),
-                  title: Text('Notification preferences'),
-                  subtitle: Text('Waiting for a backend settings contract'),
-                  enabled: false,
+                  title: const Text('Communication channels'),
+                  subtitle: const Text('Telegram (Active) · WhatsApp (Coming soon)'),
+                  trailing: const VyaparIcon(VyaparIcons.forward, size: 18),
+                  onTap: () => context.push('/more/channels'),
                 ),
                 const Divider(indent: 64),
                 const ListTile(
