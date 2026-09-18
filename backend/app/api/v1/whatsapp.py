@@ -17,18 +17,36 @@ from app.infrastructure.db.session import get_session
 from app.integrations.whatsapp.meta import verify_webhook_signature
 
 router = APIRouter(prefix="/webhooks/whatsapp", tags=["whatsapp"])
+"""Meta WhatsApp Cloud API webhook endpoint (Coming Soon).
+
+The WhatsApp channel is currently in preview/coming-soon status.
+The active production-ready channel for merchant approvals is Telegram (@PaytmOneVyapar_bot).
+"""
 
 
 @router.get("")
 async def verify(
+    response: Response,
     mode: str | None = Query(default=None, alias="hub.mode"),
     verify_token: str | None = Query(default=None, alias="hub.verify_token"),
     challenge: str | None = Query(default=None, alias="hub.challenge"),
     settings: Settings = Depends(get_settings),
 ) -> Response:
+    """WhatsApp webhook challenge verification (Channel Status: Coming Soon)."""
+    response.headers["X-Channel-Status"] = "coming_soon"
+    if mode is None:
+        return Response(
+            content='{"channel":"WHATSAPP","status":"coming_soon","message":"WhatsApp integration is coming soon. Active interactive channel is Telegram (@PaytmOneVyapar_bot)."}',
+            media_type="application/json",
+            headers={"X-Channel-Status": "coming_soon"},
+        )
     expected = settings.whatsapp_verify_token
     if mode == "subscribe" and expected and verify_token == expected.get_secret_value():
-        return Response(content=challenge or "", media_type="text/plain")
+        return Response(
+            content=challenge or "",
+            media_type="text/plain",
+            headers={"X-Channel-Status": "coming_soon"},
+        )
     raise HTTPException(status_code=403, detail="Webhook verification failed")
 
 
@@ -130,4 +148,9 @@ async def webhook(
                 else:
                     await service.reject(approval.id, merchant_id=merchant.id, user_id=user.id)
                     await session.commit()
-    return {"received": accepted}
+    return {
+        "received": accepted,
+        "status": "coming_soon",
+        "channel": "WHATSAPP",
+        "message": "WhatsApp channel is in preview (Coming Soon). Active interactive channel is Telegram (@PaytmOneVyapar_bot).",
+    }

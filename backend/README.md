@@ -26,9 +26,9 @@ See [architecture](docs/architecture.md), [A2A protocol](docs/a2a-protocol.md), 
 - `app/application`: business use cases and transaction boundaries
 - `app/agents`: LangGraph state, nodes, tools, runtime, and narrow agent roles
 - `app/a2a`: the project-owned signed `vyapaar-a2a-v1` protocol
-- `app/channels`: WhatsApp and Sarvam voice channels
+- `app/channels`: Telegram bot, Sarvam voice, and WhatsApp (coming soon) channels
 - `app/ml`: deterministic baseline and LightGBM forecasting
-- `app/integrations`: Azure/OpenAI, supplier, WhatsApp, and storage adapters
+- `app/integrations`: Telegram, Azure/OpenAI, supplier, WhatsApp, and storage adapters
 - `app/infrastructure`: SQLAlchemy, Redis, outbox, and observability
 - `migrations`: Alembic environment and initial schema
 - `scripts`: idempotent demo seed and credential-free happy path
@@ -108,9 +108,17 @@ same `request_id`. Modification creates a new proposal, hash, token, and approva
 
 ## External providers
 
+Set `TELEGRAM_BOT_TOKEN` in `.env` to enable the interactive Telegram bot (`@PaytmOneVyapar_bot`).
+Merchants receive real-time replenishment alerts, OTP codes, and can approve orders via inline buttons
+(`POST /webhooks/telegram`).
+
 Set `LLM_PROVIDER=azure` with the `AZURE_` fields to enable structured Azure OpenAI calls. Set the
-`SARVAM_` fields for realtime `saaras:v4-realtime` STT and `bulbul:v3` streaming TTS. Set all
-`WHATSAPP_` fields, including an explicit current Graph API version, to enable Meta delivery.
+`SARVAM_` fields for realtime `saaras:v4-realtime` STT and `bulbul:v3` streaming TTS. Set `RESEND_API_KEY`
+for transactional email delivery.
+
+Meta WhatsApp Cloud API (`WHATSAPP_` fields, `/webhooks/whatsapp`) is currently in preview / coming-soon status.
+The active interactive channel for merchant alerts and one-tap approvals is Telegram.
+
 Missing optional credentials do not stop the API; their endpoints report the integration as
 unavailable. Production configuration rejects a memory checkpointer or weak JWT secret.
 
