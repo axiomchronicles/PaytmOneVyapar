@@ -263,6 +263,18 @@ async def lifespan(app: FastAPI):
 
     bridge = RedisRealtimeBridge(app.state.redis.client, app.state.realtime_hub)
     bridge_task = asyncio.create_task(bridge.run(), name="redis-realtime-bridge")
+
+    telegram_poller_task = None
+    if settings.telegram_bot_token and app.state.telegram_provider and settings.app_env != "test":
+        try:
+            webhook_info = await app.state.telegram_provider.get_webhook_info()
+            if not webhook_info.get("url"):
+                telegram_poller_task = asyncio.create_task(
+                    run_telegram_poller(app, settings), name="telegram-long-poller"
+                )
+        except Exception as exc:
+            logger.warning("telegram_poller_init_failed", error=str(exc))
+
     try:
         if settings.app_checkpointer == "postgres":
             async with postgres_checkpointer(settings.database_url) as checkpointer:
@@ -272,11 +284,46 @@ async def lifespan(app: FastAPI):
             _wire_runtime(app, settings, InMemorySaver())
             yield
     finally:
+        if telegram_poller_task:
+            telegram_poller_task.cancel()
+            await asyncio.gather(telegram_poller_task, return_exceptions=True)
         bridge.stop()
         bridge_task.cancel()
         await asyncio.gather(bridge_task, return_exceptions=True)
         await app.state.provider_http_client.aclose()
         await app.state.redis.close()
+
+
+async def run_telegram_poller(app: FastAPI, settings: Settings) -> None:
+    """Long-polls getUpdates from Telegram when webhook URL is not publicly configured."""
+    from app.api.v1.telegram import process_telegram_update
+    from app.infrastructure.db.session import get_session_factory
+
+    provider: TelegramBotProvider | None = getattr(app.state, "telegram_provider", None)
+    if not provider:
+        return
+    offset = None
+    logger.info("telegram_long_poller_started", bot_username=settings.telegram_bot_username)
+    while True:
+        try:
+            updates = await provider.get_updates(offset=offset, timeout=20)
+            if updates:
+                factory = get_session_factory()
+                for update in updates:
+                    offset = update.get("update_id", 0) + 1
+                    async with factory() as session:
+                        await process_telegram_update(
+                            update,
+                            session=session,
+                            settings=settings,
+                            provider=provider,
+                            workflow_runtime=getattr(app.state, "workflow_runtime", None),
+                        )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.debug("telegram_poller_error", error=str(exc))
+            await asyncio.sleep(2)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

@@ -312,3 +312,64 @@ def test_phone_candidates_generation() -> None:
     candidates_with_plus = phone_candidates("+919811223344")
     assert "9811223344" in candidates_with_plus
     assert "+919811223344" in candidates_with_plus
+
+
+def test_telegram_registry_and_active_otp() -> None:
+    from app.channels.telegram.registry import (
+        get_active_otp,
+        get_telegram_chat_for_phone,
+        register_phone_telegram,
+        store_active_otp,
+    )
+
+    register_phone_telegram("9546730793", "998877", username="testuser")
+    assert get_telegram_chat_for_phone("9546730793") == "998877"
+    assert get_telegram_chat_for_phone("919546730793") == "998877"
+
+    store_active_otp("9546730793", "445566")
+    assert get_active_otp("9546730793") == "445566"
+    assert get_active_otp("919546730793") == "445566"
+
+
+@pytest.mark.asyncio
+async def test_telegram_otp_command_execution(db_factory) -> None:
+    from app.api.v1.telegram import process_telegram_update
+    from app.channels.telegram.registry import register_phone_telegram, store_active_otp
+    from app.core.config import Settings
+
+    settings = Settings(
+        app_env="test",
+        telegram_bot_token="test-token",
+        auth_jwt_secret="secret-secret-secret-secret-32-chars",
+        auth_approval_secret="secret-secret-secret-secret-32-chars",
+    )
+    mock_provider = AsyncMock()
+    mock_provider.send_text.return_value = "msg-otp-cmd"
+
+    # Pre-link phone and store active OTP
+    register_phone_telegram("9546730793", "884422")
+    store_active_otp("9546730793", "789123")
+
+    update_payload = {
+        "update_id": 9001,
+        "message": {
+            "message_id": 501,
+            "from": {"id": 884422, "first_name": "Merchant"},
+            "chat": {"id": 884422},
+            "text": "/otp",
+        },
+    }
+
+    async with db_factory() as session:
+        accepted = await process_telegram_update(
+            update_payload,
+            session=session,
+            settings=settings,
+            provider=mock_provider,
+        )
+        assert accepted == 1
+
+    mock_provider.send_text.assert_called_once()
+    args, _ = mock_provider.send_text.call_args
+    assert args[0] == "884422"
+    assert "789123" in args[1]

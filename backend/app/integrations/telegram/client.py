@@ -179,11 +179,32 @@ class TelegramBotProvider:
         result = await self._call("deleteWebhook", payload)
         return bool(result)
 
+    async def get_updates(
+        self,
+        *,
+        offset: int | None = None,
+        limit: int = 100,
+        poll_timeout: int = 20,
+        allowed_updates: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Long-poll incoming updates from Telegram when webhook is not active."""
+        payload: dict[str, Any] = {
+            "limit": limit,
+            "timeout": poll_timeout,
+        }
+        if offset is not None:
+            payload["offset"] = offset
+        if allowed_updates is not None:
+            payload["allowed_updates"] = allowed_updates
+        result = await self._call("getUpdates", payload, timeout_override=float(poll_timeout + 5))
+        return list(result or [])
+
     async def _call(
         self,
         method: str,
         payload: dict[str, Any],
         idempotency_key: str | None = None,
+        timeout_override: float | None = None,
     ) -> Any:
         url = f"{self.base_api_url}/{method}"
         headers = {"Content-Type": "application/json"}
@@ -192,7 +213,9 @@ class TelegramBotProvider:
 
         for attempt in range(3):
             try:
-                response = await self.client.post(url, json=payload, headers=headers)
+                kw = {"timeout": timeout_override} if timeout_override else {}
+                response = await self.client.post(url, json=payload, headers=headers, **kw)
+
                 if response.status_code in {401, 403}:
                     raise ProviderAuthenticationError(
                         f"Telegram bot authentication failed: {response.text}"

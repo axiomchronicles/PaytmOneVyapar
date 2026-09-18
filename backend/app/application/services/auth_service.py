@@ -170,7 +170,6 @@ class MultiChannelOtpDelivery:
                 return
             raise OtpDeliveryUnavailableError("Email OTP delivery is not configured")
 
-
         if self.telegram is not None:
             try:
                 await self.telegram.send(identifier, otp, idempotency_key=idempotency_key)
@@ -345,6 +344,12 @@ class OtpService:
 
         delivery_target, fallback_email = await self._resolve_delivery_info(normalized)
 
+        from app.channels.telegram.registry import store_active_otp
+
+        store_active_otp(normalized, otp)
+        if delivery_target != normalized:
+            store_active_otp(delivery_target, otp)
+
         if self.settings.app_env in {"development", "test"}:
             logger.info(
                 "development_otp_code",
@@ -402,6 +407,12 @@ class OtpService:
         challenge.attempts = 0
 
         delivery_target, fallback_email = await self._resolve_delivery_info(challenge.identifier)
+
+        from app.channels.telegram.registry import store_active_otp
+
+        store_active_otp(challenge.identifier, otp)
+        if delivery_target != challenge.identifier:
+            store_active_otp(delivery_target, otp)
 
         if self.settings.app_env in {"development", "test"}:
             logger.info(
@@ -493,6 +504,13 @@ class OtpService:
         fallback_email = None
 
         if "@" not in identifier:
+            from app.channels.telegram.registry import get_telegram_chat_for_phone
+
+            # Check dynamic registry first (e.g. newly connected phone via /connect)
+            reg_chat = get_telegram_chat_for_phone(identifier)
+            if reg_chat:
+                delivery_target = str(reg_chat)
+
             merchant = await self._merchant_for_phone(identifier)
             if merchant is not None:
                 user = await self.session.scalar(
@@ -504,7 +522,7 @@ class OtpService:
                 tg_chat_id = (merchant.settings or {}).get("telegram_chat_id")
                 if tg_chat_id:
                     delivery_target = str(tg_chat_id)
-                elif fallback_email:
+                elif fallback_email and not reg_chat:
                     delivery_target = fallback_email
 
         return delivery_target, fallback_email

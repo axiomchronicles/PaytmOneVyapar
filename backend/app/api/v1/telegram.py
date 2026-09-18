@@ -8,11 +8,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.services.approval_service import ApprovalService
+from app.application.services.auth_service import phone_candidates
 from app.channels.telegram.approval_handler import (
     TelegramApprovalAction,
     parse_approval_callback,
 )
 from app.channels.telegram.formatter import format_decision_confirmation
+from app.channels.telegram.registry import (
+    _PHONE_TO_CHAT,
+    get_active_otp,
+    register_phone_telegram,
+)
 from app.channels.telegram.webhook import parse_telegram_webhook
 from app.core.config import Settings, get_settings
 from app.domain.enums import ApprovalStatus
@@ -56,31 +62,15 @@ async def get_telegram_status(
     }
 
 
-@router.post("")
-async def telegram_webhook(
-    request: Request,
+async def process_telegram_update(
     payload: dict[str, Any],
-    x_telegram_bot_api_secret_token: str | None = Header(default=None),
-    session: AsyncSession = Depends(get_session),
-    settings: Settings = Depends(get_settings),
-) -> dict[str, Any]:
-    """Handle incoming updates (commands, messages, callback queries) from Telegram."""
-    if settings.telegram_bot_token is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Telegram bot channel is not configured",
-        )
-
-    # Validate secret token if configured
-    if settings.telegram_webhook_secret:
-        expected = settings.telegram_webhook_secret.get_secret_value()
-        if not verify_telegram_secret(x_telegram_bot_api_secret_token, expected):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Telegram webhook secret token",
-            )
-
-    provider: TelegramBotProvider | None = getattr(request.app.state, "telegram_provider", None)
+    *,
+    session: AsyncSession,
+    settings: Settings,
+    provider: TelegramBotProvider | None,
+    workflow_runtime: Any | None = None,
+) -> int:
+    """Process an incoming update item or webhook payload from Telegram."""
     inbound_items = parse_telegram_webhook(payload)
     accepted = 0
 
@@ -206,8 +196,8 @@ async def telegram_webhook(
                 continue
 
             # Resume workflow or execute direct approval/rejection
-            if approval.workflow_request_id and hasattr(request.app.state, "workflow_runtime"):
-                await request.app.state.workflow_runtime.resume(
+            if approval.workflow_request_id and workflow_runtime is not None:
+                await workflow_runtime.resume(
                     merchant_id=merchant.id,
                     request_id=approval.workflow_request_id,
                     action=(
@@ -263,7 +253,8 @@ async def telegram_webhook(
                     f"and bring purchase proposals right here for your one-tap approval.\n\n"
                     f"🆔 <b>Your Telegram Chat ID:</b> <code>{item.chat_id}</code>\n\n"
                     f"<b>Quick Commands:</b>\n"
-                    f"• <code>/connect &lt;phone&gt;</code> - Link your merchant account\n"
+                    f"• <code>/connect &lt;phone&gt;</code> - Link your mobile number to receive OTPs & alerts\n"
+                    f"• <code>/otp</code> - View your active login/registration code\n"
                     f"• <code>/status</code> - View pending purchase approvals\n"
                     f"• <code>/help</code> - Show commands and assistance"
                 )
@@ -274,12 +265,13 @@ async def telegram_webhook(
                 if len(parts) < 2:
                     await provider.send_text(
                         item.chat_id,
-                        "ℹ️ Please supply your registered phone number or email:\n"
-                        "Example: <code>/connect 9876543210</code> or <code>/connect merchant@example.com</code>",
+                        "ℹ️ Please supply your mobile number or registered email:\n"
+                        "Example: <code>/connect 9546730793</code> or <code>/connect merchant@example.com</code>",
                     )
                     continue
 
                 identifier = parts[1].strip()
+                clean_phone = "".join(c for c in identifier if c.isdigit() or c == "+")
                 # Lookup by phone or email
                 merchant = None
                 if "@" in identifier:
@@ -289,14 +281,7 @@ async def telegram_webhook(
                     if user:
                         merchant = await session.get(Merchant, user.merchant_id)
                 else:
-                    clean_phone = "".join(c for c in identifier if c.isdigit() or c == "+")
-                    # Try exact, without +91, or with +91
-                    candidates = [clean_phone]
-                    if clean_phone.startswith("+91"):
-                        candidates.append(clean_phone[3:])
-                    elif len(clean_phone) == 10:
-                        candidates.append(f"+91{clean_phone}")
-
+                    candidates = phone_candidates(clean_phone)
                     merchant = await session.scalar(
                         select(Merchant).where(Merchant.phone_number.in_(candidates))
                     )
@@ -308,6 +293,7 @@ async def telegram_webhook(
                         cur_settings["telegram_username"] = item.username
                     merchant.settings = cur_settings
                     await session.commit()
+                    register_phone_telegram(merchant.phone_number, item.chat_id, item.username)
 
                     await provider.send_text(
                         item.chat_id,
@@ -318,11 +304,41 @@ async def telegram_webhook(
                         f"You will now receive replenishment recommendations and instant approval prompts here!",
                     )
                 else:
+                    # Pre-link phone for new registrations or unseeded merchants
+                    register_phone_telegram(clean_phone, item.chat_id, item.username)
                     await provider.send_text(
                         item.chat_id,
-                        "❌ <b>Merchant Not Found</b>\n\n"
-                        "We couldn't find a merchant account matching that identifier. "
-                        "Please verify your registered number in the Vyapar app.",
+                        f"✅ <b>Mobile Number Connected!</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"<b>Phone:</b> <code>{clean_phone}</code>\n"
+                        f"<b>Telegram Chat ID:</b> <code>{item.chat_id}</code>\n\n"
+                        f"Your phone is now linked to this Telegram chat! Tap <b>Send OTP</b> in the Vyapar app "
+                        f"and your verification code will arrive directly right here.\n\n"
+                        f"💡 <i>Tip: You can also type <code>/otp</code> here to check your code anytime.</i>",
+                    )
+
+            elif cmd in {"/otp", "/code"}:
+                active = get_active_otp(str(item.chat_id))
+                if not active:
+                    for ph, cid in _PHONE_TO_CHAT.items():
+                        if cid == str(item.chat_id):
+                            active = get_active_otp(ph)
+                            if active:
+                                break
+
+                if active:
+                    await provider.send_text(
+                        item.chat_id,
+                        f"🔐 <b>Your Active Verification Code</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👉 <code>{active}</code> 👈\n\n"
+                        f"Enter this 6-digit code in the Vyapar app to complete verification.",
+                    )
+                else:
+                    await provider.send_text(
+                        item.chat_id,
+                        "ℹ️ No active verification code found for this chat.\n"
+                        "Tap <b>Send OTP</b> in the Vyapar app, or use <code>/connect &lt;phone&gt;</code> first.",
                     )
 
             elif cmd == "/status":
@@ -376,7 +392,8 @@ async def telegram_webhook(
                     "📖 <b>Paytm ONE Vyapar Bot Guide</b>\n"
                     "━━━━━━━━━━━━━━━━━━━━\n"
                     "• <code>/start</code> - Bot introduction and Chat ID\n"
-                    "• <code>/connect &lt;phone&gt;</code> - Link your merchant account\n"
+                    "• <code>/connect &lt;phone&gt;</code> - Link your mobile number to receive OTPs & alerts\n"
+                    "• <code>/otp</code> - View your active login/registration code\n"
                     "• <code>/status</code> - View pending purchase approvals\n"
                     "• <code>/help</code> - Show this assistance message\n\n"
                     "When an automated reorder recommendation is ready, you will receive "
@@ -384,4 +401,39 @@ async def telegram_webhook(
                 )
                 await provider.send_text(item.chat_id, help_text)
 
+    return accepted
+
+
+@router.post("")
+async def telegram_webhook(
+    request: Request,
+    payload: dict[str, Any],
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    """Handle incoming updates (commands, messages, callback queries) from Telegram webhook."""
+    if settings.telegram_bot_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram bot channel is not configured",
+        )
+
+    # Validate secret token if configured
+    if settings.telegram_webhook_secret:
+        expected = settings.telegram_webhook_secret.get_secret_value()
+        if not verify_telegram_secret(x_telegram_bot_api_secret_token, expected):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Telegram webhook secret token",
+            )
+
+    provider: TelegramBotProvider | None = getattr(request.app.state, "telegram_provider", None)
+    accepted = await process_telegram_update(
+        payload,
+        session=session,
+        settings=settings,
+        provider=provider,
+        workflow_runtime=getattr(request.app.state, "workflow_runtime", None),
+    )
     return {"received": accepted, "status": "processed"}
