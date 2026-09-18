@@ -277,9 +277,7 @@ class MockSupplierAdapter:
     def correlation_id_for_quote(self, quote_id: str) -> UUID | None:
         return self._quote_correlations.get(quote_id)
 
-    def pop_pending_messages(
-        self, idempotency_key: str
-    ) -> list[tuple[A2AEnvelope, str, UUID]]:
+    def pop_pending_messages(self, idempotency_key: str) -> list[tuple[A2AEnvelope, str, UUID]]:
         return self._pending_messages.pop(idempotency_key, [])
 
     def _envelope(

@@ -346,9 +346,7 @@ class ChannelMessage(UUIDPrimaryKey, Timestamped, Base):
 
 class OutboxEvent(UUIDPrimaryKey, Timestamped, Base):
     __tablename__ = "outbox_events"
-    __table_args__ = (
-        Index("ix_outbox_pending_created", "published_at", "created_at"),
-    )
+    __table_args__ = (Index("ix_outbox_pending_created", "published_at", "created_at"),)
 
     merchant_id: Mapped[UUID | None] = mapped_column(ForeignKey("merchants.id"), index=True)
     aggregate_type: Mapped[str] = mapped_column(String(100), index=True)

@@ -39,8 +39,10 @@ class OrderRepository:
         cursor: tuple[datetime, UUID] | None,
         limit: int,
     ) -> list[tuple[Order, Supplier]]:
-        query = select(Order, Supplier).join(Supplier, Supplier.id == Order.supplier_id).where(
-            Order.merchant_id == merchant_id
+        query = (
+            select(Order, Supplier)
+            .join(Supplier, Supplier.id == Order.supplier_id)
+            .where(Order.merchant_id == merchant_id)
         )
         if status:
             query = query.where(Order.status == status)
@@ -66,9 +68,11 @@ class OrderRepository:
                 )
             )
         return list(
-            (await self.session.execute(
-                query.order_by(Order.created_at.desc(), Order.id.desc()).limit(limit + 1)
-            )).tuples()
+            (
+                await self.session.execute(
+                    query.order_by(Order.created_at.desc(), Order.id.desc()).limit(limit + 1)
+                )
+            ).tuples()
         )
 
     async def supplier(self, supplier_id: UUID) -> Supplier:

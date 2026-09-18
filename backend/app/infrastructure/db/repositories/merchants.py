@@ -18,7 +18,9 @@ class MerchantRepository:
         return merchant
 
     async def user_by_email(self, email: str) -> User | None:
-        return await self.session.scalar(select(User).where(func.lower(User.email) == email.lower()))
+        return await self.session.scalar(
+            select(User).where(func.lower(User.email) == email.lower())
+        )
 
     async def stores(self, merchant_id: UUID) -> list[Store]:
         result = await self.session.scalars(select(Store).where(Store.merchant_id == merchant_id))

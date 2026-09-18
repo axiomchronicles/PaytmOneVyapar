@@ -86,7 +86,13 @@ def extract_voice_intent(text: str) -> VoiceIntent:
     matches = [
         (match.start(), value)
         for word, value in _NUMBER_WORDS.items()
-        if (match := (re.search(rf"\b{re.escape(word)}\b", normalized) if word.isascii() else re.search(re.escape(word), normalized)))
+        if (
+            match := (
+                re.search(rf"\b{re.escape(word)}\b", normalized)
+                if word.isascii()
+                else re.search(re.escape(word), normalized)
+            )
+        )
     ]
     quantity = min(matches)[1] if matches else None
     numeric = re.search(r"\b(\d+)\b", normalized)

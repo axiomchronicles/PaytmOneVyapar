@@ -1,8 +1,8 @@
-
 from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -37,6 +37,8 @@ from app.domain.enums import OAuthProvider
 from app.infrastructure.db.repositories.merchants import MerchantRepository
 from app.infrastructure.db.session import get_session
 
+logger = structlog.get_logger()
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -54,9 +56,7 @@ async def token(
         or not verify_password(form.password, user.password_hash)
     ):
         raise AuthenticationError("Invalid email or password")
-    result = await SessionService(session, settings).issue(
-        user, device_name=form.client_id
-    )
+    result = await SessionService(session, settings).issue(user, device_name=form.client_id)
     await session.commit()
     return TokenResponse.model_validate(result)
 
@@ -214,9 +214,9 @@ async def exchange_oauth(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> AuthResult:
-    result = await OAuthService(
-        session, settings, request.app.state.oauth_verifier
-    ).exchange(_oauth_provider(provider), **body.model_dump())
+    result = await OAuthService(session, settings, request.app.state.oauth_verifier).exchange(
+        _oauth_provider(provider), **body.model_dump()
+    )
     await session.commit()
     return AuthResult.model_validate(result)
 
@@ -230,9 +230,7 @@ async def link_oauth(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict:
-    result = await OAuthService(
-        session, settings, request.app.state.oauth_verifier
-    ).exchange(
+    result = await OAuthService(session, settings, request.app.state.oauth_verifier).exchange(
         _oauth_provider(provider),
         **body.model_dump(),
         link_user_id=principal.user_id,
@@ -356,8 +354,8 @@ p {{ color: #94a3b8; font-size: 15px; line-height: 1.5; }}
                     "provider": selected.value,
                     "result": auth_result,
                 }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("oauth_auto_exchange_skipped", error=str(exc))
 
     return {
         "status": "success",

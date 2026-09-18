@@ -77,9 +77,13 @@ async def list_negotiations(
             )
         )
     rows = list(
-        (await session.execute(
-            query.order_by(Negotiation.created_at.desc(), Negotiation.id.desc()).limit(limit + 1)
-        )).tuples()
+        (
+            await session.execute(
+                query.order_by(Negotiation.created_at.desc(), Negotiation.id.desc()).limit(
+                    limit + 1
+                )
+            )
+        ).tuples()
     )
     return CursorPage(
         items=[_view(row, supplier.name) for row, supplier in rows[:limit]],

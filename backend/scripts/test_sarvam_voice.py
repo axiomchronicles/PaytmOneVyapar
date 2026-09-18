@@ -274,8 +274,12 @@ async def run_scenario_for_language(
 
     print("\n" + "=" * 70)
     print(f"🗣️  TESTING LANGUAGE: {lang_name.upper()} [{lang_code}]")
-    print(f"• Voice Persona: Female Assistant ({'Sarvam ritu' if use_sarvam else f'macOS {mac_voice}'})")
-    print(f"• Speech Engine: {'Sarvam AI bulbul:v3 Neural TTS' if use_sarvam else 'macOS High-Fidelity Speech Engine'}")
+    print(
+        f"• Voice Persona: Female Assistant ({'Sarvam ritu' if use_sarvam else f'macOS {mac_voice}'})"
+    )
+    print(
+        f"• Speech Engine: {'Sarvam AI bulbul:v3 Neural TTS' if use_sarvam else 'macOS High-Fidelity Speech Engine'}"
+    )
     print("=" * 70)
 
     # Initialize LangGraph runtime dependencies
@@ -289,7 +293,10 @@ async def run_scenario_for_language(
         transaction_executor=SecureMemoryTransactionExecutor(approvals, [supplier]),
     )
     from langgraph.checkpoint.memory import InMemorySaver
-    runtime = WorkflowRuntime(build_purchase_graph(services, checkpointer=InMemorySaver()), approvals)
+
+    runtime = WorkflowRuntime(
+        build_purchase_graph(services, checkpointer=InMemorySaver()), approvals
+    )
 
     merchant_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
     user_id = UUID("99999999-9999-4999-8999-999999999999")
@@ -300,7 +307,11 @@ async def run_scenario_for_language(
             VoiceIntentType.MODIFY_ACTIVE_PROPOSAL,
             VoiceIntentType.REJECT_ACTIVE_PROPOSAL,
         }:
-            if not session.active_request_id or not session.active_proposal_id or not session.approval_token:
+            if (
+                not session.active_request_id
+                or not session.active_proposal_id
+                or not session.approval_token
+            ):
                 return get_voice_message("no_active_proposal", session.language_code)
             action = {
                 VoiceIntentType.APPROVE_ACTIVE_PROPOSAL: ApprovalStatus.APPROVED,
@@ -312,7 +323,9 @@ async def run_scenario_for_language(
                 request_id=session.active_request_id,
                 action=action,
                 approval_token=session.approval_token,
-                quantity=float(intent.quantity) if (intent.quantity and action == ApprovalStatus.MODIFIED) else None,
+                quantity=float(intent.quantity)
+                if (intent.quantity and action == ApprovalStatus.MODIFIED)
+                else None,
                 user_id=session.user_id,
                 expected_proposal_id=session.active_proposal_id,
             )
@@ -335,7 +348,9 @@ async def run_scenario_for_language(
     print(f"\n[1. Low Stock Alert] Merchant says: '{spoken_1}'")
 
     if use_sarvam and raw_sarvam_provider:
-        prov_1 = SarvamSimulatedTranscribeProvider(raw_sarvam_provider, simulated_transcript=spoken_1)
+        prov_1 = SarvamSimulatedTranscribeProvider(
+            raw_sarvam_provider, simulated_transcript=spoken_1
+        )
     else:
         prov_1 = SmoothMacVoiceProvider(
             voice_name=mac_voice,
@@ -350,9 +365,11 @@ async def run_scenario_for_language(
     chunks_1: list[bytes] = []
     async for event in pipe_1.run(sess_1, dummy_audio_stream()):
         if event.type == VoiceEventType.ACTION:
-            print(f"   🧠 Detected Intent: {event.metadata.get('intent')} (sku={event.metadata.get('sku_hint')})")
+            print(
+                f"   🧠 Detected Intent: {event.metadata.get('intent')} (sku={event.metadata.get('sku_hint')})"
+            )
         elif event.type == VoiceEventType.RESPONSE_TEXT:
-            print(f"   🤖 Female Agent Speaks ({lang_name}): \"{event.text}\"")
+            print(f'   🤖 Female Agent Speaks ({lang_name}): "{event.text}"')
         elif event.type == VoiceEventType.AUDIO and event.audio:
             chunks_1.append(event.audio)
 
@@ -392,13 +409,17 @@ async def run_scenario_for_language(
         "attempted_supplier_ids": [],
     }
     waiting_state = await runtime.start(initial_wf)
-    print(f"\n[2. Voice Approval] Proposed 6 crates @ ₹{waiting_state['proposal']['unit_price']}/crate")
+    print(
+        f"\n[2. Voice Approval] Proposed 6 crates @ ₹{waiting_state['proposal']['unit_price']}/crate"
+    )
 
     spoken_2 = config["approve_input"]
     print(f"   Merchant says: '{spoken_2}'")
 
     if use_sarvam and raw_sarvam_provider:
-        prov_2 = SarvamSimulatedTranscribeProvider(raw_sarvam_provider, simulated_transcript=spoken_2)
+        prov_2 = SarvamSimulatedTranscribeProvider(
+            raw_sarvam_provider, simulated_transcript=spoken_2
+        )
     else:
         prov_2 = SmoothMacVoiceProvider(
             voice_name=mac_voice,
@@ -420,9 +441,11 @@ async def run_scenario_for_language(
     chunks_2: list[bytes] = []
     async for event in pipe_2.run(sess_2, dummy_audio_stream()):
         if event.type == VoiceEventType.ACTION:
-            print(f"   🧠 Detected Intent: {event.metadata.get('intent')} (explicit={event.metadata.get('explicit_confirmation')})")
+            print(
+                f"   🧠 Detected Intent: {event.metadata.get('intent')} (explicit={event.metadata.get('explicit_confirmation')})"
+            )
         elif event.type == VoiceEventType.RESPONSE_TEXT:
-            print(f"   🤖 Female Agent Speaks ({lang_name}): \"{event.text}\"")
+            print(f'   🤖 Female Agent Speaks ({lang_name}): "{event.text}"')
         elif event.type == VoiceEventType.AUDIO and event.audio:
             chunks_2.append(event.audio)
 
@@ -438,13 +461,24 @@ async def main() -> None:
         help="Language to test (default: hindi, or 'all' to cycle through all 7 languages)",
     )
     parser.add_argument("--api-key", help="Sarvam AI API Subscription Key (overrides .env)")
-    parser.add_argument("--speaker", default="ritu", help="Sarvam TTS Speaker (default: ritu, female voice)")
-    parser.add_argument("--temperature", type=float, default=0.6, help="bulbul:v3 expressiveness (0.01-2.0, default: 0.6)")
-    parser.add_argument("--pace", type=float, default=1.0, help="Speech pace speed (0.5-2.0, default: 1.0)")
+    parser.add_argument(
+        "--speaker", default="ritu", help="Sarvam TTS Speaker (default: ritu, female voice)"
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.6,
+        help="bulbul:v3 expressiveness (0.01-2.0, default: 0.6)",
+    )
+    parser.add_argument(
+        "--pace", type=float, default=1.0, help="Speech pace speed (0.5-2.0, default: 1.0)"
+    )
     args = parser.parse_args()
 
     settings = get_settings()
-    api_key = args.api_key or (settings.sarvam_api_key.get_secret_value() if settings.sarvam_api_key else None)
+    api_key = args.api_key or (
+        settings.sarvam_api_key.get_secret_value() if settings.sarvam_api_key else None
+    )
     is_valid_sarvam_key = bool(api_key and api_key != "change-me-temporary")
 
     print("=" * 70)

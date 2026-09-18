@@ -26,12 +26,14 @@ async def overview(
     created_from: Annotated[datetime | None, Query()] = None,
     created_to: Annotated[datetime | None, Query()] = None,
 ) -> AnalyticsOverviewView:
-    return AnalyticsOverviewView.model_validate(await AnalyticsService(session).overview(
-        principal.merchant_id,
-        store_id=store_id,
-        created_from=created_from,
-        created_to=created_to,
-    ))
+    return AnalyticsOverviewView.model_validate(
+        await AnalyticsService(session).overview(
+            principal.merchant_id,
+            store_id=store_id,
+            created_from=created_from,
+            created_to=created_to,
+        )
+    )
 
 
 @router.get("/sales", response_model=SalesAnalyticsView)
@@ -43,13 +45,15 @@ async def sales(
     created_to: Annotated[datetime | None, Query()] = None,
     group_by: Annotated[str, Query(pattern="^(day|week|month)$")] = "day",
 ) -> SalesAnalyticsView:
-    return SalesAnalyticsView.model_validate(await AnalyticsService(session).sales(
-        principal.merchant_id,
-        store_id=store_id,
-        created_from=created_from,
-        created_to=created_to,
-        group_by=group_by,
-    ))
+    return SalesAnalyticsView.model_validate(
+        await AnalyticsService(session).sales(
+            principal.merchant_id,
+            store_id=store_id,
+            created_from=created_from,
+            created_to=created_to,
+            group_by=group_by,
+        )
+    )
 
 
 @router.get("/inventory", response_model=InventoryAnalyticsView)
@@ -71,9 +75,11 @@ async def procurement(
     created_from: Annotated[datetime | None, Query()] = None,
     created_to: Annotated[datetime | None, Query()] = None,
 ) -> ProcurementAnalyticsView:
-    return ProcurementAnalyticsView.model_validate(await AnalyticsService(session).procurement(
-        principal.merchant_id,
-        store_id=store_id,
-        created_from=created_from,
-        created_to=created_to,
-    ))
+    return ProcurementAnalyticsView.model_validate(
+        await AnalyticsService(session).procurement(
+            principal.merchant_id,
+            store_id=store_id,
+            created_from=created_from,
+            created_to=created_to,
+        )
+    )

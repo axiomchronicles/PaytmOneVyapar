@@ -35,7 +35,7 @@ class RedisRealtimeBridge:
                 logger.warning(
                     "realtime_bridge_disconnected",
                     error_type=type(exc).__name__,
-                    retry_seconds=2**(retry - 1),
+                    retry_seconds=2 ** (retry - 1),
                 )
                 await asyncio.sleep(2 ** (retry - 1))
 

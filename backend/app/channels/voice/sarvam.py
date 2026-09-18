@@ -128,9 +128,7 @@ class SarvamVoiceProvider:
                                 provider_status=getattr(message, "status_code", None),
                                 provider_message=str(getattr(message, "message", ""))[:200],
                             )
-                            raise ProviderError(
-                                "Voice transcription provider failed"
-                            )
+                            raise ProviderError("Voice transcription provider failed")
                         elif event == "session.end":
                             break
                 finally:

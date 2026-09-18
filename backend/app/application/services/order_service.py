@@ -225,9 +225,7 @@ class OrderService:
         )
         self.session.add(notification)
         await self.session.flush()
-        a2a_correlation_id = getattr(
-            self.supplier, "correlation_id_for_quote", lambda _: None
-        )(
+        a2a_correlation_id = getattr(self.supplier, "correlation_id_for_quote", lambda _: None)(
             proposal.quote_id
         )
         if a2a_correlation_id is not None:

@@ -105,8 +105,7 @@ async def list_orders(
         limit=limit,
     )
     items = [
-        await serialize_order(repository, order, supplier.name)
-        for order, supplier in rows[:limit]
+        await serialize_order(repository, order, supplier.name) for order, supplier in rows[:limit]
     ]
     cursor_value = next_cursor([order for order, _ in rows], limit)
     return CursorPage(items=items, next_cursor=cursor_value)

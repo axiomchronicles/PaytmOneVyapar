@@ -224,9 +224,7 @@ def test_approval_expiry_idempotency_and_tenant_isolation(
 
     async def prepare():
         async with db_factory() as session, session.begin():
-            session.add(
-                Supplier(id=supplier_id, merchant_id=MERCHANT_ID, name="Approval Supplier")
-            )
+            session.add(Supplier(id=supplier_id, merchant_id=MERCHANT_ID, name="Approval Supplier"))
             service = ApprovalService(
                 ApprovalRepository(session),
                 secret=settings.auth_approval_secret.get_secret_value(),
@@ -263,9 +261,7 @@ def test_approval_expiry_idempotency_and_tenant_isolation(
 
     approval_id, token, expired_id, expired_token, foreign_id = asyncio.run(prepare())
     body = {"approval_token": token, "idempotency_key": "same-approval-action"}
-    first = client.post(
-        f"/api/v1/approvals/{approval_id}/approve", headers=auth_headers, json=body
-    )
+    first = client.post(f"/api/v1/approvals/{approval_id}/approve", headers=auth_headers, json=body)
     second = client.post(
         f"/api/v1/approvals/{approval_id}/approve", headers=auth_headers, json=body
     )

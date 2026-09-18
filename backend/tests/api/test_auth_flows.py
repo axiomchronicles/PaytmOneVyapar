@@ -125,7 +125,7 @@ def test_otp_expiry_and_attempt_limit(client, db_factory) -> None:
     async def expire() -> None:
         async with db_factory() as session, session.begin():
             row = await session.scalar(
-                    select(OtpChallenge).where(OtpChallenge.id == UUID(expired_id))
+                select(OtpChallenge).where(OtpChallenge.id == UUID(expired_id))
             )
             row.expires_at = utc_now() - timedelta(seconds=1)
 
@@ -195,12 +195,17 @@ def test_otp_login_for_existing_merchant(client) -> None:
 
 
 def test_oauth_start_with_configured_google_client_id(client, settings) -> None:
-    settings.google_oauth_client_id = "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    settings.google_oauth_client_id = (
+        "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    )
     client.app.state.oauth_verifier = FakeOAuthVerifier()
     start = client.post("/api/v1/auth/oauth/google/start")
     assert start.status_code == 201
     payload = start.json()
-    assert payload["client_id"] == "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    assert (
+        payload["client_id"]
+        == "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    )
     assert payload["provider"] == "GOOGLE"
     assert len(payload["state"]) >= 20
     assert len(payload["nonce"]) >= 20
@@ -221,9 +226,7 @@ def test_oauth_callback_endpoint(client) -> None:
     assert err_resp.json()["error"] == "access_denied"
 
     # Success status when Google redirects with code
-    success_resp = client.get(
-        "/api/v1/auth/oauth/google/callback?code=mock-auth-code&state=xyz123"
-    )
+    success_resp = client.get("/api/v1/auth/oauth/google/callback?code=mock-auth-code&state=xyz123")
     assert success_resp.status_code == 200
     assert success_resp.json()["status"] == "success"
     assert success_resp.json()["code"] == "mock-auth-code"
@@ -232,7 +235,9 @@ def test_oauth_callback_endpoint(client) -> None:
 def test_oauth_code_exchange(client, settings) -> None:
     from pydantic import SecretStr
 
-    settings.google_oauth_client_id = "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    settings.google_oauth_client_id = (
+        "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    )
     settings.google_oauth_client_secret = SecretStr("TEST_OAUTH_CLIENT_SECRET_PLACEHOLDER")
     client.app.state.oauth_verifier = FakeOAuthVerifier()
 
@@ -251,7 +256,9 @@ def test_oauth_code_exchange(client, settings) -> None:
 
 
 def test_oauth_new_user_registration(client, settings) -> None:
-    settings.google_oauth_client_id = "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    settings.google_oauth_client_id = (
+        "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    )
     client.app.state.oauth_verifier = FakeOAuthVerifier()
 
     start = client.post("/api/v1/auth/oauth/google/start").json()
@@ -293,7 +300,9 @@ def test_email_otp_request_and_verify(client) -> None:
 
 
 def test_oauth_authorize_endpoint(client, settings) -> None:
-    settings.google_oauth_client_id = "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    settings.google_oauth_client_id = (
+        "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    )
     client.app.state.oauth_verifier = FakeOAuthVerifier()
 
     # JSON response
@@ -306,7 +315,10 @@ def test_oauth_authorize_endpoint(client, settings) -> None:
     assert "authorization_url" in data
     assert "https://accounts.google.com/o/oauth2/v2/auth" in data["authorization_url"]
     assert "client_id=" in data["authorization_url"]
-    assert "redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fapi%2Fv1%2Fauth%2Foauth%2Fgoogle%2Fcallback" in data["authorization_url"]
+    assert (
+        "redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fapi%2Fv1%2Fauth%2Foauth%2Fgoogle%2Fcallback"
+        in data["authorization_url"]
+    )
 
     # Redirect response for browser
     redirect_resp = client.get(
@@ -321,7 +333,9 @@ def test_oauth_authorize_endpoint(client, settings) -> None:
 def test_oauth_callback_auto_exchange(client, settings) -> None:
     from pydantic import SecretStr
 
-    settings.google_oauth_client_id = "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    settings.google_oauth_client_id = (
+        "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+    )
     settings.google_oauth_client_secret = SecretStr("TEST_OAUTH_CLIENT_SECRET_PLACEHOLDER")
     client.app.state.oauth_verifier = FakeOAuthVerifier()
 
@@ -358,6 +372,7 @@ def test_oauth_callback_auto_exchange(client, settings) -> None:
 def test_email_test_endpoint(client, settings) -> None:
     import httpx
     from pydantic import SecretStr
+
     from app.integrations.email.resend import ResendEmailProvider
 
     settings.resend_api_key = SecretStr("re_test_key")

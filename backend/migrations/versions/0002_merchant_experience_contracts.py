@@ -42,9 +42,7 @@ def upgrade() -> None:
     )
 
     op.add_column("negotiations", sa.Column("store_id", sa.Uuid(), nullable=True))
-    op.add_column(
-        "negotiations", sa.Column("workflow_request_id", sa.String(128), nullable=True)
-    )
+    op.add_column("negotiations", sa.Column("workflow_request_id", sa.String(128), nullable=True))
     op.add_column("negotiations", sa.Column("proposal_id", sa.Uuid(), nullable=True))
     op.add_column("negotiations", sa.Column("current_quote", sa.JSON(), nullable=True))
     op.create_foreign_key(
@@ -199,7 +197,11 @@ def upgrade() -> None:
     )
 
     indexes = [
-        ("ix_negotiations_merchant_status_created", "negotiations", ["merchant_id", "status", "created_at"]),
+        (
+            "ix_negotiations_merchant_status_created",
+            "negotiations",
+            ["merchant_id", "status", "created_at"],
+        ),
         ("ix_a2a_messages_merchant_created", "a2a_messages", ["merchant_id", "created_at"]),
         ("ix_outbox_pending_created", "outbox_events", ["published_at", "created_at"]),
         ("ix_refresh_sessions_user_expires", "refresh_sessions", ["user_id", "expires_at"]),
@@ -207,7 +209,11 @@ def upgrade() -> None:
         ("ix_otp_expiry_consumed", "otp_challenges", ["expires_at", "consumed_at"]),
         ("ix_oauth_challenge_expiry", "oauth_challenges", ["expires_at", "consumed_at"]),
         ("ix_order_events_order_created", "order_events", ["order_id", "created_at"]),
-        ("ix_notifications_merchant_read_created", "notifications", ["merchant_id", "is_read", "created_at"]),
+        (
+            "ix_notifications_merchant_read_created",
+            "notifications",
+            ["merchant_id", "is_read", "created_at"],
+        ),
     ]
     with op.get_context().autocommit_block():
         for name, table, columns in indexes:

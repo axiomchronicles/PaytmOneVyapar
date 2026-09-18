@@ -40,9 +40,7 @@ def test_authenticated_shortage_to_order_history_flow(client, db_factory, settin
                 forecast_model=BaselineForecaster(),
                 suppliers=[supplier],
                 approval_authority=authority,
-                transaction_executor=DatabaseTransactionExecutor(
-                    db_factory, authority, [supplier]
-                ),
+                transaction_executor=DatabaseTransactionExecutor(db_factory, authority, [supplier]),
                 activity_recorder=DatabaseWorkflowActivityRecorder(db_factory),
             ),
             checkpointer=InMemorySaver(),

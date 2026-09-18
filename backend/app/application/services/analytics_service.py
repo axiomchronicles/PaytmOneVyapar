@@ -49,13 +49,9 @@ class AnalyticsService:
             sales_query = sales_query.where(Sale.store_id == store_id)
             inventory_query = inventory_query.where(Inventory.store_id == store_id)
             orders_query = orders_query.where(Order.store_id == store_id)
-        sales_quantity = await self.session.scalar(
-            sales_query
-        )
+        sales_quantity = await self.session.scalar(sales_query)
         low_inventory = await self.session.scalar(inventory_query)
-        orders = await self.session.execute(
-            orders_query.group_by(Order.status)
-        )
+        orders = await self.session.execute(orders_query.group_by(Order.status))
         return {
             "sales_quantity": sales_quantity,
             "low_inventory_products": low_inventory,
@@ -77,9 +73,7 @@ class AnalyticsService:
             raise InvalidRequestError("Sales grouping must be day, week, or month")
         dialect = self.session.bind.dialect.name if self.session.bind else "postgresql"
         if dialect == "postgresql":
-            pattern = {"day": "YYYY-MM-DD", "week": "IYYY-\"W\"IW", "month": "YYYY-MM"}[
-                group_by
-            ]
+            pattern = {"day": "YYYY-MM-DD", "week": 'IYYY-"W"IW', "month": "YYYY-MM"}[group_by]
             bucket = func.to_char(Sale.sold_at, pattern)
         elif group_by == "day":
             bucket = func.strftime("%Y-%m-%d", Sale.sold_at)
@@ -113,9 +107,9 @@ class AnalyticsService:
             select(
                 func.coalesce(Product.category, "Uncategorized").label("label"),
                 func.count(Inventory.id).label("products"),
-                func.sum(case((Inventory.quantity_on_hand <= Inventory.reorder_point, 1), else_=0)).label(
-                    "low_products"
-                ),
+                func.sum(
+                    case((Inventory.quantity_on_hand <= Inventory.reorder_point, 1), else_=0)
+                ).label("low_products"),
             )
             .join(Product, Product.id == Inventory.product_id)
             .where(Inventory.merchant_id == merchant_id)
