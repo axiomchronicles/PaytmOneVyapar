@@ -38,17 +38,15 @@ class HomeScreen extends ConsumerWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: const [
           SliverSection(child: _MerchantTopBar()),
-          SliverSection(child: SizedBox(height: 12)),
-          SliverSection(child: _MerchantQuickActionsStrip()),
           SliverSection(child: SizedBox(height: 14)),
-          SliverSection(child: _CriticalStockAlert()),
-          SliverSection(child: SizedBox(height: 14)),
-          SliverSection(child: _AajKaHaalContainerCard()),
-          SliverSection(child: SizedBox(height: 14)),
-          SliverSection(child: _MerchantProcurementAndDealsCard()),
-          SliverSection(child: SizedBox(height: 14)),
+          SliverSection(child: _MerchantHeroBanner()),
+          SliverSection(child: SizedBox(height: 18)),
+          SliverSection(child: _AajKaHaalSection()),
+          SliverSection(child: SizedBox(height: 18)),
           SliverSection(child: _OpportunitiesSection()),
-          SliverSection(child: SizedBox(height: 14)),
+          SliverSection(child: SizedBox(height: 18)),
+          SliverSection(child: _JaldiKareinSection()),
+          SliverSection(child: SizedBox(height: 16)),
           SliverSection(child: _MunimVoiceBanner()),
           SliverPadding(padding: EdgeInsets.only(bottom: 24)),
         ],
@@ -58,7 +56,7 @@ class HomeScreen extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Premium Merchant Top Bar (Avatar + Brand & Store Dropdown + Search + Bell)
+// 1. Merchant Top Bar (Brand + Tagline + Notification + Avatar + Store Selector)
 // ---------------------------------------------------------------------------
 class _MerchantTopBar extends ConsumerWidget {
   const _MerchantTopBar();
@@ -73,8 +71,8 @@ class _MerchantTopBar extends ConsumerWidget {
     );
     final storeName = profile.when(
       data: (p) => p.name,
-      loading: () => 'Sharma General Store',
-      error: (_, _) => 'Sharma General Store',
+      loading: () => 'Ramesh General Store',
+      error: (_, _) => 'Ramesh General Store',
     );
     final locality = profile.when(
       data: (p) => p.stores.firstOrNull?.locality ?? 'Karol Bagh, New Delhi',
@@ -82,398 +80,358 @@ class _MerchantTopBar extends ConsumerWidget {
       error: (_, _) => 'Karol Bagh, New Delhi',
     );
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Merchant Initials Avatar Circle (coral pink with deep crimson text)
-          InkWell(
-            onTap: () => context.push('/more/profile'),
-            borderRadius: BorderRadius.circular(22),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFD5D6),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    color: Color(0xFFBA1A1A),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          // Center: Paytm One | Vyapar branding + Store selector dropdown
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Top row: Logo + Tagline | Bell + Avatar
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const VyaparLogo(height: 32),
+            const SizedBox(width: 8),
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const VyaparLogo(height: 21),
-                const SizedBox(height: 2),
-                InkWell(
-                  onTap: () => _showStoreBottomSheet(context, storeName, locality),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                IconButton(
+                  tooltip: 'Notifications',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  onPressed: () => context.push('/notifications'),
+                  icon: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      Flexible(
-                        child: Text(
-                          storeName,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1D232C),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
                       const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: Color(0xFF64748B),
+                        Icons.notifications_none_rounded,
+                        size: 26,
+                        color: Color(0xFF1D232C),
                       ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          '• $locality',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w500,
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE51A4C),
+                            shape: BoxShape.circle,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Right: Search and Notification Bell
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: 'Search Inventory & Orders',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                onPressed: () => context.push('/inventory'),
-                icon: const Icon(
-                  Icons.search_rounded,
-                  size: 24,
-                  color: Color(0xFF1D232C),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Notifications',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                onPressed: () => context.push('/notifications'),
-                icon: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const Icon(
-                      Icons.notifications_none_rounded,
-                      size: 24,
-                      color: Color(0xFF1D232C),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => context.push('/more/profile'),
+                  borderRadius: BorderRadius.circular(19),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFDDEEFE),
+                      shape: BoxShape.circle,
                     ),
-                    Positioned(
-                      top: 1,
-                      right: 1,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFE51A4C),
-                          shape: BoxShape.circle,
+                    child: Center(
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                          color: Color(0xFF002E6E),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
                         ),
                       ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        // Store Selector row
+        InkWell(
+          onTap: () => _showStoreBottomSheet(context, storeName, locality),
+          borderRadius: BorderRadius.circular(10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/store_thumb.png',
+                  width: 38,
+                  height: 38,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEBF5FE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      color: Color(0xFF007AEB),
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            storeName,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1D232C),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 18,
+                          color: Color(0xFF1D232C),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_rounded,
+                          size: 13,
+                          color: Color(0xFF007AEB),
+                        ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            locality,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 2. Vyapar Quick Actions (4 Solid Deep Paytm Blue Action Circles)
-// ---------------------------------------------------------------------------
-class _MerchantQuickActionsStrip extends ConsumerWidget {
-  const _MerchantQuickActionsStrip();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(merchantControllerProvider).value;
-    final analytics = ref.watch(analyticsControllerProvider).value;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Jaldi karein (Quick Actions)',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF1D232C),
-            letterSpacing: -0.3,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _MerchantCircleAction(
-                icon: Icons.qr_code_scanner_rounded,
-                label: 'Payment\nQR / Soundbox',
-                onTap: () => _showPaymentQrSheet(context, profile),
-              ),
-            ),
-            Expanded(
-              child: _MerchantCircleAction(
-                icon: Icons.account_balance_wallet_outlined,
-                label: 'Settlements\n& Payouts',
-                onTap: () => _showSettlementsSheet(
-                  context,
-                  analytics?.expectedSettlement ?? 17980.0,
-                ),
-              ),
-            ),
-            Expanded(
-              child: _MerchantCircleAction(
-                icon: Icons.inventory_2_outlined,
-                label: 'Stock &\nInventory',
-                onTap: () => context.push('/inventory'),
-              ),
-            ),
-            Expanded(
-              child: _MerchantCircleAction(
-                icon: Icons.smart_toy_outlined,
-                label: 'Munim AI\nAssistant',
-                onTap: () => context.push('/munim'),
-              ),
-            ),
-          ],
         ),
       ],
     );
   }
 }
 
-class _MerchantCircleAction extends StatelessWidget {
-  const _MerchantCircleAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+// ---------------------------------------------------------------------------
+// 2. Hero Section (Illustration Background + Headline + Subtext)
+// ---------------------------------------------------------------------------
+class _MerchantHeroBanner extends ConsumerStatefulWidget {
+  const _MerchantHeroBanner();
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: const BoxDecoration(
-              color: Color(0xFF002E6E),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x1F002E6E),
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Icon(icon, color: Colors.white, size: 26),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1E293B),
-              height: 1.15,
-            ),
-            maxLines: 2,
-          ),
-        ],
-      ),
-    ),
-  );
+  ConsumerState<_MerchantHeroBanner> createState() => _MerchantHeroBannerState();
 }
 
-// ---------------------------------------------------------------------------
-// 3. Critical Stock Alert ("Dhyaan dene layak")
-// ---------------------------------------------------------------------------
-class _CriticalStockAlert extends ConsumerWidget {
-  const _CriticalStockAlert();
+class _MerchantHeroBannerState extends ConsumerState<_MerchantHeroBanner> {
+  late final PageController _pageController;
+  int _currentIndex = 0;
+  Timer? _autoPlayTimer;
+
+  static const _slides = [
+    (
+      image: 'assets/hero_bg.webp',
+      prefix: 'Aapke Vyapar ka har hisaab, ',
+      highlight: 'ek nazar mein',
+    ),
+    (
+      image: 'assets/hero_1.webp',
+      prefix: 'Dukaan ka har kaam ab aur bhi, ',
+      highlight: 'aasaan',
+    ),
+    (
+      image: 'assets/hero_2.webp',
+      prefix: 'Digital payment aur vyapar ka, ',
+      highlight: 'pakka saathi',
+    ),
+    (
+      image: 'assets/hero_3.webp',
+      prefix: 'Stock aur munafa badhaiye, ',
+      highlight: 'apne andaaz mein',
+    ),
+  ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final inventory = ref.watch(inventoryControllerProvider);
-    final lowCount = inventory.value?.where((item) => item.isLow).length;
-    final firstLow = inventory.value?.where((item) => item.isLow).firstOrNull;
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+      if (!isTest) {
+        _autoPlayTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+          if (!mounted || !_pageController.hasClients) return;
+          final next = (_currentIndex + 1) % _slides.length;
+          _pageController.animateToPage(
+            next,
+            duration: const Duration(milliseconds: 450),
+            curve: Curves.easeInOutCubic,
+          );
+        });
+      }
+    });
+  }
 
-    final signalSubtext = switch ((inventory.isLoading, lowCount)) {
-      (true, _) => 'Checking your shop now…',
-      (_, null) => 'Sirf 12 units bache hain. Is weekend demand 28% zyada rehne ki sambhaavna hai.',
-      (_, 0) => 'No inventory item is below its reorder point.',
-      (_, final count) =>
-        '$count inventory ${count == 1 ? 'item needs' : 'items need'} attention.',
-    };
+  @override
+  void dispose() {
+    _autoPlayTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
 
-    final title = firstLow != null
-        ? '${firstLow.name} ka stock kal tak khatam ho sakta hai'
-        : 'Cold drinks ka stock kal tak khatam ho sakta hai';
+  @override
+  Widget build(BuildContext context) {
+    final profile = ref.watch(merchantControllerProvider).value;
+    final merchantName = profile?.name ?? 'Ramesh General Store';
+    final rawFirst = merchantName.trim().split(RegExp(r'\s+')).firstOrNull ?? 'Ramesh';
+    final firstName = (rawFirst.toLowerCase() == 'my' || rawFirst.toLowerCase() == 'sharma')
+        ? 'Ramesh'
+        : rawFirst;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textWidth = (constraints.maxWidth * 0.44).clamp(130.0, 165.0);
+
+        return Container(
+          width: double.infinity,
+          height: 176,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F7FF),
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFECEB),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.local_drink_rounded,
-                color: Color(0xFFC92A2A),
-                size: 24,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.error_outline_rounded,
-                      color: AppColors.danger,
-                      size: 13,
-                    ),
-                    SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        'Dhyaan dene layak',
-                        style: TextStyle(
-                          color: AppColors.danger,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: _pageController,
+                itemCount: _slides.length,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final slide = _slides[index];
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        slide.image,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.centerRight,
+                      ),
+                      Positioned(
+                        left: 14,
+                        top: 12,
+                        bottom: 22,
+                        width: textWidth,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Hello $firstName ji,',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1D232C),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 5),
+                              RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(
+                                    fontSize: 16.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF002E6E),
+                                    height: 1.18,
+                                    letterSpacing: -0.3,
+                                  ),
+                                  children: [
+                                    TextSpan(text: slide.prefix),
+                                    TextSpan(
+                                      text: slide.highlight,
+                                      style: const TextStyle(color: Color(0xFF00BAF2)),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              Positioned(
+                left: 14,
+                bottom: 10,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(
+                    _slides.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.only(right: 4),
+                      width: _currentIndex == index ? 14 : 5,
+                      height: 4.5,
+                      decoration: BoxDecoration(
+                        color: _currentIndex == index
+                            ? const Color(0xFF007AEB)
+                            : const Color(0xFFB0CBE8),
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1D232C),
-                    height: 1.2,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  signalSubtext,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: () => context.push('/inventory'),
-            style: TextButton.styleFrom(
-              backgroundColor: const Color(0xFFFFECEB),
-              foregroundColor: const Color(0xFFC92A2A),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
               ),
-              visualDensity: VisualDensity.compact,
-            ),
-            child: const Text(
-              'Review →',
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// 4. "Aaj ka haal" Merchant Pulse Container Card (Clean white rounded container)
+// 3. "Aaj ka haal" Section (Header + 4 Columns + Critical Stock Alert)
 // ---------------------------------------------------------------------------
-class _AajKaHaalContainerCard extends ConsumerWidget {
-  const _AajKaHaalContainerCard();
+class _AajKaHaalSection extends ConsumerWidget {
+  const _AajKaHaalSection();
 
   String _formatTodayDate() {
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -488,353 +446,483 @@ class _AajKaHaalContainerCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = ref.watch(analyticsControllerProvider).value;
+    final inventory = ref.watch(inventoryControllerProvider);
     final totalSales = analytics?.totalSalesAmount ?? 18420.0;
     final salesGrowth = analytics?.salesGrowthPct ?? 12.0;
     final customerCount = analytics?.customerCount ?? 146;
     final expectedSettlement = analytics?.expectedSettlement ?? 17980.0;
+    final lowCount = inventory.value?.where((item) => item.isLow).length;
+    final firstLow = inventory.value?.where((item) => item.isLow).firstOrNull;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    final signalSubtext = switch ((inventory.isLoading, lowCount)) {
+      (true, _) => 'Checking your shop now…',
+      (_, null) => 'Sirf 12 units bache hain. Is weekend demand 28% zyada rehne ki sambhaavna hai (38°C).',
+      (_, 0) => 'No inventory item is below its reorder point.',
+      (_, final count) =>
+        '$count inventory ${count == 1 ? 'item needs' : 'items need'} attention.',
+    };
+
+    final title = firstLow != null
+        ? '${firstLow.name} ka stock kal tak khatam ho sakta hai'
+        : 'Cold drinks ka stock kal tak khatam ho sakta hai';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title Row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(
+              child: Text(
+                'Aaj ka haal',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF002E6E),
+                  letterSpacing: -0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _formatTodayDate(),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        // 4 Stat Columns in a single row
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Col 1: Total Sales
+            Expanded(
+              child: InkWell(
+                onTap: () => context.push('/analytics'),
+                borderRadius: BorderRadius.circular(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F8F0),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: VyaparIcon(
+                          VyaparIcons.chartUp,
+                          size: 18,
+                          color: Color(0xFF00BA7A),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Total Sales',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      formatInr(totalSales),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1D232C),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.arrow_upward_rounded,
+                          size: 11,
+                          color: Color(0xFF00A66E),
+                        ),
+                        const SizedBox(width: 1),
+                        Text(
+                          '${salesGrowth.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF00A66E),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Text(
+                      'Kal se zyada',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Col 2: Customers
+            Expanded(
+              child: InkWell(
+                onTap: () => context.push('/analytics'),
+                borderRadius: BorderRadius.circular(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: VyaparIcon(
+                          VyaparIcons.userGroup,
+                          size: 18,
+                          color: Color(0xFF00BAF2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Customers',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$customerCount',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1D232C),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.arrow_upward_rounded,
+                          size: 11,
+                          color: Color(0xFF00A66E),
+                        ),
+                        SizedBox(width: 1),
+                        Text(
+                          '8%',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF00A66E),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Text(
+                      'Kal se zyada',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Col 3: Settlement (Expected)
+            Expanded(
+              child: InkWell(
+                onTap: () => _showSettlementsSheet(context, expectedSettlement),
+                borderRadius: BorderRadius.circular(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEBF5FE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: VyaparIcon(
+                          VyaparIcons.wallet,
+                          size: 18,
+                          color: Color(0xFF007AEB),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Settlement\n(Expected)',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                        height: 1.15,
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      formatInr(expectedSettlement),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1D232C),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    const Text(
+                      'Aaj',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Col 4: Low Stock Items
+            Expanded(
+              child: InkWell(
+                onTap: () => context.push('/inventory'),
+                borderRadius: BorderRadius.circular(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3E8FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.inventory_2_outlined,
+                          size: 18,
+                          color: Color(0xFF8B5CF6),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Low Stock Items',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                        height: 1.15,
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${lowCount ?? 3}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1D232C),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFECEB),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Action needed →',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFE51A4C),
+                          ),
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        // Critical Stock Alert Card
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.035),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Expanded(
-                child: Text(
-                  'Aaj ka haal',
-                  style: TextStyle(
-                    fontSize: 17.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1D232C),
-                    letterSpacing: -0.2,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/coke_crate.png',
+                  width: 58,
+                  height: 58,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFECEB),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.local_drink,
+                      color: Color(0xFFE51A4C),
+                      size: 28,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 15,
+                          height: 15,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE51A4C),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Flexible(
+                          child: Text(
+                            'Dhyaan dene layak',
+                            style: TextStyle(
+                              color: Color(0xFFE51A4C),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1D232C),
+                        height: 1.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      signalSubtext,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: Color(0xFF64748B),
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                _formatTodayDate(),
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.muted,
+              InkWell(
+                onTap: () => context.push('/inventory'),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFECEB),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text(
+                    'Review →',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFE51A4C),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _PulseMetricTile(
-                  icon: VyaparIcons.chartUp,
-                  iconColor: AppColors.success,
-                  title: 'Total Sales',
-                  value: '₹${formatInr(totalSales)}',
-                  badgeText: '↑ ${salesGrowth.toStringAsFixed(0)}% Kal se zyada',
-                  badgeColor: AppColors.success,
-                  onTap: () => context.push('/analytics'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _PulseMetricTile(
-                  icon: VyaparIcons.userGroup,
-                  iconColor: AppColors.blue,
-                  title: 'Customers',
-                  value: '$customerCount',
-                  badgeText: '↑ 8% Kal se zyada',
-                  badgeColor: AppColors.blue,
-                  onTap: () => context.push('/analytics'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _PulseMetricTile(
-                  icon: VyaparIcons.wallet,
-                  iconColor: const Color(0xFF007AEB),
-                  title: 'Settlement (Expected)',
-                  value: '₹${formatInr(expectedSettlement)}',
-                  badgeText: 'Aaj 4:00 PM tak',
-                  badgeColor: const Color(0xFF007AEB),
-                  onTap: () => _showSettlementsSheet(context, expectedSettlement),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _PulseMetricTile(
-                  icon: VyaparIcons.inventory,
-                  iconColor: const Color(0xFFE06D10),
-                  title: 'Low Stock Items',
-                  value: '3',
-                  badgeText: 'Action needed →',
-                  badgeColor: AppColors.danger,
-                  onTap: () => context.push('/inventory'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFDCE5EF),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _PulseMetricTile extends StatelessWidget {
-  const _PulseMetricTile({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.value,
-    required this.badgeText,
-    required this.badgeColor,
-    required this.onTap,
-  });
-
-  final List<List<dynamic>> icon;
-  final Color iconColor;
-  final String title;
-  final String value;
-  final String badgeText;
-  final Color badgeColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(12),
-    child: Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF64748B),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 4),
-              VyaparIcon(icon, size: 15, color: iconColor),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16.5,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1D232C),
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            badgeText,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: badgeColor,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 // ---------------------------------------------------------------------------
-// 5. Merchant Procurement & Wholesale Deals Card (A2A & Bulk purchasing)
-// ---------------------------------------------------------------------------
-class _MerchantProcurementAndDealsCard extends StatelessWidget {
-  const _MerchantProcurementAndDealsCard();
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: InkWell(
-          onTap: () => context.push('/suppliers'),
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.035),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'A2A Suppliers',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1D232C),
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Compare prices &\norder direct stock',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: Color(0xFF64748B),
-                          height: 1.2,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF0F6FE),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: VyaparIcon(
-                      VyaparIcons.truck,
-                      size: 20,
-                      color: Color(0xFF007AEB),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: InkWell(
-          onTap: () => context.push('/negotiations'),
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.035),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Bulk Discounts',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1D232C),
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Wholesale deals &\nsavings on crates',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: Color(0xFF64748B),
-                          height: 1.2,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFF7ED),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: VyaparIcon(
-                      VyaparIcons.tag,
-                      size: 20,
-                      color: Color(0xFFF59E0B),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 6. "Aapke liye mauke" (Actionable AI Recommendations)
+// 4. "Aapke liye mauke" (Actionable AI Recommendations)
 // ---------------------------------------------------------------------------
 class _OpportunitiesSection extends ConsumerWidget {
   const _OpportunitiesSection();
@@ -853,9 +941,9 @@ class _OpportunitiesSection extends ConsumerWidget {
               child: Text(
                 'Aapke liye mauke',
                 style: TextStyle(
-                  fontSize: 17.5,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF1D232C),
+                  color: Color(0xFF002E6E),
                   letterSpacing: -0.2,
                 ),
                 maxLines: 1,
@@ -876,7 +964,7 @@ class _OpportunitiesSection extends ConsumerWidget {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         recommendations.when(
           loading: () => const ListSkeleton(rows: 2),
           error: (error, _) => AppErrorState(
@@ -891,7 +979,7 @@ class _OpportunitiesSection extends ConsumerWidget {
               );
             }
             return SizedBox(
-              height: 175,
+              height: 172,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -905,11 +993,10 @@ class _OpportunitiesSection extends ConsumerWidget {
                           ? VyaparIcons.chartUp
                           : (index == 1 ? VyaparIcons.truck : VyaparIcons.tag),
                       iconColor: index == 0
-                          ? AppColors.blue
-                          : (index == 1 ? AppColors.success : const Color(0xFFE06D10)),
-                      iconBg: index == 0
-                          ? AppColors.paleBlue
-                          : (index == 1 ? const Color(0xFFE8F7F0) : const Color(0xFFFFF2E6)),
+                          ? const Color(0xFF007AEB)
+                          : (index == 1
+                              ? const Color(0xFF00BA7A)
+                              : const Color(0xFFF59E0B)),
                       title: index == 0
                           ? 'Weekend offer chalayein cold drinks par'
                           : (index == 1
@@ -918,8 +1005,9 @@ class _OpportunitiesSection extends ConsumerWidget {
                       subtitle: index == 0
                           ? '₹5,000+ tak extra revenue ki sambhaavna'
                           : (index == 1
-                              ? 'North Delhi Distributor Se ₹375 ki bachat'
+                              ? 'North Delhi Distributor\nSe ₹375 ki bachat'
                               : 'Aaj hi local customers ko target karein'),
+                      isSubtitleSuccess: index <= 1,
                       sku: item.sku,
                       actionLabel: index == 0
                           ? 'Offer Banayein →'
@@ -940,10 +1028,10 @@ class _OpportunitiesSection extends ConsumerWidget {
                   }
                   return _OpportunityCard(
                     icon: VyaparIcons.tag,
-                    iconColor: const Color(0xFFE06D10),
-                    iconBg: const Color(0xFFFFF2E6),
+                    iconColor: const Color(0xFFF59E0B),
                     title: 'Cricket match ke chalte sales badh rahi hain',
                     subtitle: 'Aaj hi local customers ko target karein',
+                    isSubtitleSuccess: false,
                     actionLabel: 'Campaign Chalayein →',
                     onAction: () => _showCampaignDialog(
                       context,
@@ -964,30 +1052,31 @@ class _OpportunityCard extends StatelessWidget {
   const _OpportunityCard({
     required this.icon,
     required this.iconColor,
-    required this.iconBg,
     required this.title,
     required this.subtitle,
     required this.actionLabel,
     required this.onAction,
+    this.isSubtitleSuccess = false,
     this.sku,
   });
 
   final List<List<dynamic>> icon;
   final Color iconColor;
-  final Color iconBg;
   final String title;
   final String subtitle;
   final String actionLabel;
   final VoidCallback onAction;
+  final bool isSubtitleSuccess;
   final String? sku;
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 250,
-    padding: const EdgeInsets.all(14),
+    width: 240,
+    padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFF1F5F9)),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withValues(alpha: 0.035),
@@ -1003,17 +1092,7 @@ class _OpportunityCard extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: VyaparIcon(icon, size: 18, color: iconColor),
-              ),
-            ),
+            VyaparIcon(icon, size: 22, color: iconColor),
             if (sku case final code?)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1024,7 +1103,7 @@ class _OpportunityCard extends StatelessWidget {
                 child: Text(
                   code,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.bold,
                     color: AppColors.navy,
                   ),
@@ -1049,25 +1128,31 @@ class _OpportunityCard extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               subtitle,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10.5,
-                color: Color(0xFF64748B),
+                color: isSubtitleSuccess
+                    ? const Color(0xFF00A66E)
+                    : const Color(0xFF64748B),
+                fontWeight: isSubtitleSuccess ? FontWeight.w600 : FontWeight.normal,
                 height: 1.15,
               ),
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
+        SizedBox(
+          width: double.infinity,
+          height: 34,
+          child: OutlinedButton(
             onPressed: onAction,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF007AEB),
+              side: const BorderSide(color: Color(0xFF007AEB)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
             ),
             child: Text(
               actionLabel,
@@ -1081,7 +1166,128 @@ class _OpportunityCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 7. Munim AI Voice Assistant Floating Banner CTA
+// 5. "Jaldi karein" (Quick Action 5 Columns Row)
+// ---------------------------------------------------------------------------
+class _JaldiKareinSection extends ConsumerWidget {
+  const _JaldiKareinSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(merchantControllerProvider).value;
+    final analytics = ref.watch(analyticsControllerProvider).value;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Jaldi karein',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF002E6E),
+            letterSpacing: -0.2,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildQuickActionItem(
+              icon: const VyaparIcon(
+                VyaparIcons.qrCode,
+                size: 26,
+                color: Color(0xFF007AEB),
+              ),
+              label: 'Payment\nAccept Karein',
+              onTap: () => _showPaymentQrSheet(context, profile),
+            ),
+            _buildQuickActionItem(
+              icon: const VyaparIcon(
+                VyaparIcons.invoice,
+                size: 26,
+                color: Color(0xFF007AEB),
+              ),
+              label: 'Settlements\nDekhein',
+              onTap: () => _showSettlementsSheet(
+                context,
+                analytics?.expectedSettlement ?? 17980.0,
+              ),
+            ),
+            _buildQuickActionItem(
+              icon: const Icon(
+                Icons.inventory_2_outlined,
+                size: 26,
+                color: Color(0xFF007AEB),
+              ),
+              label: 'Inventory\nManage Karein',
+              onTap: () => context.push('/inventory'),
+            ),
+            _buildQuickActionItem(
+              icon: const VyaparIcon(
+                VyaparIcons.bank,
+                size: 26,
+                color: Color(0xFF007AEB),
+              ),
+              label: 'Suppliers\nDhoondhein',
+              onTap: () => context.push('/suppliers'),
+            ),
+            _buildQuickActionItem(
+              icon: const VyaparIcon(
+                VyaparIcons.megaphone,
+                size: 26,
+                color: Color(0xFF007AEB),
+              ),
+              label: 'Campaign\nChalayein',
+              onTap: () => _showCampaignDialog(
+                context,
+                title: 'Festive Season Campaign',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionItem({
+    required Widget icon,
+    required String label,
+    required VoidCallback onTap,
+  }) => Expanded(
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              height: 30,
+              child: Center(child: icon),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1D232C),
+                height: 1.18,
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 6. Munim AI Voice Assistant Banner CTA
 // ---------------------------------------------------------------------------
 class _MunimVoiceBanner extends StatelessWidget {
   const _MunimVoiceBanner();
@@ -1090,21 +1296,21 @@ class _MunimVoiceBanner extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     decoration: BoxDecoration(
-      color: const Color(0xFFEBF5FE),
+      color: const Color(0xFFF0F7FE),
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFCBE5FD)),
+      border: Border.all(color: const Color(0xFFD4E7FA)),
     ),
     child: Row(
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
           decoration: const BoxDecoration(
-            color: Color(0xFF007AEB),
+            color: Color(0xFFDDEEFE),
             shape: BoxShape.circle,
           ),
           child: const Center(
-            child: VyaparIcon(VyaparIcons.mic, size: 19, color: Colors.white),
+            child: Icon(Icons.mic_rounded, color: Color(0xFF007AEB), size: 22),
           ),
         ),
         const SizedBox(width: 10),
@@ -1116,18 +1322,18 @@ class _MunimVoiceBanner extends StatelessWidget {
               Text(
                 'Munim AI se baat karein',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF1D232C),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              SizedBox(height: 1),
+              SizedBox(height: 2),
               Text(
-                'Apne sawaal poochhein, order place karein ya stock insights paayein.',
+                'Apne sawaal poochhein, order place karein ya insights paayein.',
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 10,
                   color: Color(0xFF64748B),
                   height: 1.2,
                 ),
@@ -1138,24 +1344,25 @@ class _MunimVoiceBanner extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Flexible(
-          child: OutlinedButton.icon(
-            onPressed: () => context.push('/voice'),
-            icon: const VyaparIcon(VyaparIcons.mic, size: 12, color: Color(0xFF007AEB)),
-            label: const Text(
-              'Voice Par Baat Karein',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+        OutlinedButton.icon(
+          onPressed: () => context.push('/voice'),
+          icon: const Icon(Icons.mic_none_rounded, size: 14, color: Color(0xFF007AEB)),
+          label: const Text(
+            'Voice Par Baat Karein',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF007AEB),
             ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF007AEB),
-              side: const BorderSide(color: Color(0xFF007AEB)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF007AEB),
+            side: const BorderSide(color: Color(0xFF007AEB)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            visualDensity: VisualDensity.compact,
           ),
         ),
       ],
@@ -1318,7 +1525,7 @@ void _showSettlementsSheet(BuildContext context, double expected) {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '₹${formatInr(expected)}',
+                    formatInr(expected),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
