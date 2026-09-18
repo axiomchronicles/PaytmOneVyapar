@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vyapar/core/networking/json.dart';
 import 'package:vyapar/core/networking/realtime_event.dart';
@@ -60,7 +61,7 @@ void main() {
       'created_at': '2026-09-18T21:00:00+05:30',
     });
 
-    expect(approval.proposal.totalAmount, 9125);
+    expect(approval.proposal.totalAmount, Decimal.fromInt(9125));
     expect(approval.isPending, isTrue);
   });
 

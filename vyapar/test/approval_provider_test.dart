@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,7 +12,7 @@ class _FakeApprovalRepository extends ApprovalRepository {
   ApprovalDetail detail;
   ApprovalAction? lastAction;
   ApprovalActionContext? lastContext;
-  double? lastQuantity;
+  Decimal? lastQuantity;
 
   @override
   Future<ApprovalDetail> get(String approvalId) async => detail;
@@ -21,8 +22,8 @@ class _FakeApprovalRepository extends ApprovalRepository {
     required String approvalId,
     required ApprovalAction action,
     ApprovalActionContext? context,
-    double? quantity,
-    double? maxUnitPrice,
+    Decimal? quantity,
+    Decimal? maxUnitPrice,
   }) async {
     lastAction = action;
     lastContext = context;
@@ -49,9 +50,9 @@ final proposal = ProposalDetail(
   storeId: 'store-id',
   supplierId: 'supplier-id',
   sku: 'COLD-COLA-300',
-  quantity: 5,
+  quantity: Decimal.fromInt(5),
   unit: 'crate',
-  unitPrice: 470,
+  unitPrice: Decimal.fromInt(470),
   currency: 'INR',
   deliveryAt: DateTime(2026, 9, 20),
   quoteId: 'quote-id',
@@ -119,10 +120,10 @@ void main() {
 
     await container
         .read(approvalControllerProvider('approval-id').notifier)
-        .decide(ApprovalAction.modify, quantity: 2);
+        .decide(ApprovalAction.modify, quantity: Decimal.fromInt(2));
 
     expect(repository.lastAction, ApprovalAction.modify);
-    expect(repository.lastQuantity, 2);
+    expect(repository.lastQuantity, Decimal.fromInt(2));
   });
 
   test('reject remains available for a pending deep-linked approval', () async {

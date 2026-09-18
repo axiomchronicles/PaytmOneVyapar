@@ -1,9 +1,11 @@
+import 'package:decimal/decimal.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vyapar/core/auth/auth_session.dart' as core;
+import 'package:vyapar/core/networking/cursor_page.dart';
 import 'package:vyapar/design_system/theme/app_theme.dart';
 import 'package:vyapar/features/analytics/models/analytics_overview.dart';
 import 'package:vyapar/features/analytics/providers/analytics_provider.dart';
@@ -19,7 +21,9 @@ import 'package:vyapar/features/inventory/models/inventory_item.dart';
 import 'package:vyapar/features/inventory/presentation/inventory_screen.dart';
 import 'package:vyapar/features/inventory/providers/inventory_provider.dart';
 import 'package:vyapar/features/munim/presentation/munim_screen.dart';
+import 'package:vyapar/features/orders/models/order_detail.dart';
 import 'package:vyapar/features/orders/presentation/orders_screen.dart';
+import 'package:vyapar/features/orders/providers/order_provider.dart';
 import 'package:vyapar/features/profile/models/merchant_profile.dart';
 import 'package:vyapar/features/profile/providers/merchant_provider.dart';
 import 'package:vyapar/features/recommendations/models/recommendation.dart';
@@ -58,6 +62,11 @@ class _AnalyticsState extends AnalyticsController {
 class _VoiceState extends VoiceController {
   @override
   VoiceState build() => const VoiceState();
+}
+
+class _OrderListState extends OrderListController {
+  @override
+  Future<CursorPage<OrderDetail>> build() async => const CursorPage(items: []);
 }
 
 class _ApprovalRepository extends ApprovalRepository {
@@ -104,9 +113,9 @@ final approval = ApprovalDetail(
     storeId: 'store-id',
     supplierId: 'supplier-id',
     sku: 'COLD-COLA-300',
-    quantity: 5,
+    quantity: Decimal.fromInt(5),
     unit: 'crate',
-    unitPrice: 470,
+    unitPrice: Decimal.fromInt(470),
     currency: 'INR',
     deliveryAt: DateTime(2026, 9, 20, 12),
     quoteId: 'quote-id',
@@ -238,7 +247,10 @@ void main() {
   testWidgets('orders golden', (tester) async {
     await expectGolden(
       tester,
-      ProviderScope(child: app(const Scaffold(body: OrdersScreen()))),
+      ProviderScope(
+        overrides: [orderListProvider.overrideWith(_OrderListState.new)],
+        child: app(const Scaffold(body: OrdersScreen())),
+      ),
       'orders',
     );
   });
