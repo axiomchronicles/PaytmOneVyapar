@@ -7,10 +7,14 @@ from app.api.v1 import (
     approvals,
     auth,
     health,
+    history,
     inventory,
     merchants,
+    negotiations,
+    notifications,
     orders,
     recommendations,
+    suppliers,
     voice,
     websocket,
 )
@@ -26,5 +30,9 @@ api_router.include_router(a2a.router)
 api_router.include_router(analytics.router)
 api_router.include_router(approvals.router)
 api_router.include_router(orders.router)
+api_router.include_router(suppliers.router)
+api_router.include_router(negotiations.router)
+api_router.include_router(history.router)
+api_router.include_router(notifications.router)
 api_router.include_router(voice.router)
 api_router.include_router(websocket.router)

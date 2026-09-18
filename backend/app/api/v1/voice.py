@@ -12,8 +12,9 @@ from app.channels.voice.protocol import VoiceEventType
 from app.channels.voice.session import VoiceSession
 from app.core.config import Settings, get_settings
 from app.core.dependencies import Principal, get_current_principal
-from app.core.errors import AuthenticationError, NotFoundError
-from app.infrastructure.db.models import User
+from app.core.errors import AuthenticationError, NotFoundError, VyapaarError
+from app.core.security import as_utc, utc_now
+from app.infrastructure.db.models import RefreshSession, User
 from app.infrastructure.db.models import VoiceSession as VoiceSessionRow
 from app.infrastructure.db.session import get_session, get_session_factory
 
@@ -56,6 +57,8 @@ async def create_voice_session(
         )
     )
     await db.commit()
+    pipeline = request.app.state.voice_pipeline
+    provider = pipeline.provider if pipeline is not None else None
     return {
         "session_id": session.session_id,
         "stream_url": f"/api/v1/voice/sessions/{session.session_id}/stream",
@@ -63,6 +66,11 @@ async def create_voice_session(
         "audio": {
             "encoding": session.encoding,
             "sample_rate": session.sample_rate,
+            "channels": 1,
+        },
+        "output_audio": {
+            "codec": getattr(provider, "tts_codec", None),
+            "sample_rate": getattr(provider, "tts_sample_rate", None),
             "channels": 1,
         },
     }
@@ -74,16 +82,34 @@ async def _websocket_principal(websocket: WebSocket, token: str, settings: Setti
             token,
             settings.auth_jwt_secret.get_secret_value(),
             algorithms=[settings.auth_jwt_algorithm],
+            options={"require": ["sub", "merchant_id", "exp", "iat"]},
         )
+        if claims.get("type") != "access":
+            raise AuthenticationError("Wrong WebSocket token type")
         user_id = UUID(claims["sub"])
         merchant_id = UUID(claims["merchant_id"])
+        session_id = UUID(claims["sid"]) if claims.get("sid") else None
     except (jwt.PyJWTError, KeyError, ValueError) as exc:
         raise AuthenticationError("Invalid WebSocket token") from exc
     async with get_session_factory()() as db:
         user = await db.get(User, user_id)
         if user is None or not user.is_active or user.merchant_id != merchant_id:
             raise AuthenticationError("Inactive voice session user")
-    return Principal(user_id=user_id, merchant_id=merchant_id, role=claims.get("role", "merchant"))
+        if session_id is not None:
+            refresh_session = await db.get(RefreshSession, session_id)
+            if (
+                refresh_session is None
+                or refresh_session.revoked_at is not None
+                or as_utc(refresh_session.expires_at) <= utc_now()
+                or refresh_session.user_id != user_id
+            ):
+                raise AuthenticationError("WebSocket session is no longer active")
+    return Principal(
+        user_id=user_id,
+        merchant_id=merchant_id,
+        role=claims.get("role", "merchant"),
+        session_id=session_id,
+    )
 
 
 @router.websocket("/sessions/{session_id}/stream")
@@ -110,7 +136,11 @@ async def stream_voice(
     if pipeline is None:
         await websocket.accept()
         await websocket.send_json(
-            {"type": VoiceEventType.ERROR, "text": "Sarvam voice integration is not configured"}
+            {
+                "type": VoiceEventType.ERROR,
+                "text": "Voice service is temporarily unavailable.",
+                "code": "VOICE_NOT_CONFIGURED",
+            }
         )
         await websocket.close(code=1011)
         return
@@ -133,11 +163,16 @@ async def stream_voice(
                 else:
                     await websocket.send_json(event.model_dump(mode="json", exclude_none=True))
         except Exception as exc:
+            code = exc.code if isinstance(exc, VyapaarError) else "VOICE_PROVIDER_FAILED"
             await websocket.send_json(
                 {
                     "type": VoiceEventType.ERROR,
-                    "text": "Voice provider failed",
-                    "code": type(exc).__name__,
+                    "text": (
+                        exc.message
+                        if isinstance(exc, VyapaarError)
+                        else "Voice service is temporarily unavailable."
+                    ),
+                    "code": code,
                 }
             )
 

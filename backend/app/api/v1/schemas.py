@@ -3,7 +3,9 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+
+from app.domain.enums import OAuthProvider, OtpPurpose
 
 
 class APIModel(BaseModel):
@@ -23,7 +25,96 @@ class ErrorResponse(APIModel):
 
 class TokenResponse(APIModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+    expires_in: int
+
+
+class RefreshRequest(APIModel):
+    refresh_token: str = Field(min_length=32, max_length=512)
+    device_name: str | None = Field(default=None, max_length=120)
+
+
+class LogoutRequest(APIModel):
+    refresh_token: str | None = Field(default=None, min_length=32, max_length=512)
+
+
+class OtpRequest(APIModel):
+    identifier: str = Field(min_length=10, max_length=30)
+    purpose: OtpPurpose = OtpPurpose.LOGIN
+
+
+class OtpVerifyRequest(APIModel):
+    challenge_id: UUID
+    otp: str = Field(pattern=r"^\d{6}$")
+    device_name: str | None = Field(default=None, max_length=120)
+
+
+class OtpResendRequest(APIModel):
+    challenge_id: UUID
+
+
+class OtpChallengeResponse(APIModel):
+    challenge_id: UUID
+    destination: str
+    expires_at: datetime
+    resend_available_at: datetime
+
+
+class AuthResult(APIModel):
+    registration_required: bool = False
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str | None = None
+    expires_in: int | None = None
+    registration_token: str | None = None
+    email: EmailStr | None = None
+
+
+class RegistrationRequest(APIModel):
+    email: EmailStr
+    business_name: str = Field(min_length=2, max_length=200)
+    store_name: str = Field(min_length=2, max_length=200)
+    registration_token: str = Field(min_length=20)
+    password: str | None = Field(default=None, min_length=12, max_length=128)
+    phone_number: str | None = Field(default=None, min_length=10, max_length=30)
+    address: dict[str, Any] = Field(default_factory=dict)
+    device_name: str | None = Field(default=None, max_length=120)
+
+    @model_validator(mode="after")
+    def validate_password_strength(self) -> "RegistrationRequest":
+        if self.password and not (
+            any(char.islower() for char in self.password)
+            and any(char.isupper() for char in self.password)
+            and any(char.isdigit() for char in self.password)
+        ):
+            raise ValueError("Password must contain upper-case, lower-case, and numeric characters")
+        return self
+
+
+class OAuthExchangeRequest(APIModel):
+    challenge_id: UUID
+    state: str = Field(min_length=20, max_length=256)
+    nonce: str = Field(min_length=20, max_length=256)
+    id_token: str | None = Field(default=None, min_length=20, max_length=10000)
+    code: str | None = Field(default=None, max_length=2048)
+    redirect_uri: str | None = None
+    device_name: str | None = Field(default=None, max_length=120)
+
+    @model_validator(mode="after")
+    def validate_token_or_code(self) -> "OAuthExchangeRequest":
+        if not self.id_token and not self.code:
+            raise ValueError("Either id_token or code must be provided")
+        return self
+
+
+class OAuthStartResponse(APIModel):
+    challenge_id: UUID
+    provider: OAuthProvider
+    state: str
+    nonce: str
+    client_id: str
+    expires_at: datetime
 
 
 class InventoryItemResponse(APIModel):
@@ -51,16 +142,11 @@ class AgentRunRequest(APIModel):
     request_id: str = Field(min_length=8, max_length=128)
     store_id: UUID
     sku: str
-    quantity_on_hand: float = Field(ge=0)
-    reorder_point: float = Field(ge=0)
     safety_stock: float = Field(default=2, ge=0)
     required_quantity: float = Field(default=0, ge=0)
-    unit: str = "crate"
     target_price: float = Field(gt=0)
     max_price: float = Field(gt=0)
-    spending_limit: float = Field(gt=0)
     delivery_deadline: datetime
-    sales_history: list[dict[str, Any]] = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_price_bounds(self) -> "AgentRunRequest":

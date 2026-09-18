@@ -1,10 +1,10 @@
+import asyncio
 from collections import defaultdict
 from uuid import UUID
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.api.v1.voice import _websocket_principal
-from app.core.config import get_settings
 
 router = APIRouter(tags=["realtime"])
 
@@ -20,12 +20,12 @@ class RealtimeHub:
     def disconnect(self, merchant_id: UUID, socket: WebSocket) -> None:
         self.connections[merchant_id].discard(socket)
 
-    async def publish(self, merchant_id: UUID, event_type: str, data: dict) -> None:
+    async def publish(self, merchant_id: UUID, event: dict) -> None:
         stale = []
-        for socket in self.connections[merchant_id]:
+        for socket in tuple(self.connections[merchant_id]):
             try:
-                await socket.send_json({"type": event_type, "data": data})
-            except RuntimeError:
+                await socket.send_json(event)
+            except Exception:
                 stale.append(socket)
         for socket in stale:
             self.disconnect(merchant_id, socket)
@@ -38,7 +38,7 @@ async def events(websocket: WebSocket) -> None:
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not token:
             raise ValueError("Missing bearer token")
-        principal = await _websocket_principal(websocket, token, get_settings())
+        principal = await _websocket_principal(websocket, token, websocket.app.state.settings)
     except Exception:
         await websocket.close(code=4401)
         return
@@ -46,6 +46,12 @@ async def events(websocket: WebSocket) -> None:
     await hub.connect(principal.merchant_id, websocket)
     try:
         while True:
-            await websocket.receive_text()
+            try:
+                message = await asyncio.wait_for(websocket.receive_text(), timeout=25)
+            except TimeoutError:
+                await websocket.send_json({"type": "HEARTBEAT"})
+                continue
+            if message == "ping":
+                await websocket.send_text("pong")
     except WebSocketDisconnect:
         hub.disconnect(principal.merchant_id, websocket)
