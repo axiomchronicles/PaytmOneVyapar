@@ -18,6 +18,7 @@ class PurchaseWorkflowState(TypedDict, total=False):
     candidate_suppliers: list[dict[str, Any]]
     selected_supplier: dict[str, Any]
     negotiation_history: list[dict[str, Any]]
+    negotiation_correlation_id: str
     negotiated_price: float
     risk_result: dict[str, Any]
     proposal: dict[str, Any]

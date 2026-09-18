@@ -1,6 +1,9 @@
 from decimal import Decimal
 from uuid import UUID
 
+from app.domain.enums import NotificationType
+from app.domain.events import EventType
+from app.infrastructure.db.models import Notification, OutboxEvent
 from app.infrastructure.db.repositories.inventory import InventoryRepository
 
 
@@ -45,4 +48,44 @@ class InventoryService:
             source=source,
             idempotency_key=idempotency_key,
         )
+        self.repository.session.add(
+            OutboxEvent(
+                merchant_id=merchant_id,
+                aggregate_type="inventory",
+                aggregate_id=inventory.id,
+                event_type=EventType.INVENTORY_UPDATED,
+                payload={
+                    "inventory_id": str(inventory.id),
+                    "store_id": str(store_id),
+                    "product_id": str(product_id),
+                    "quantity_on_hand": str(inventory.quantity_on_hand),
+                },
+            )
+        )
+        if inventory.quantity_on_hand <= inventory.reorder_point:
+            notification = Notification(
+                merchant_id=merchant_id,
+                notification_type=NotificationType.INVENTORY_ALERT,
+                title="Inventory needs attention",
+                body="Stock is at or below its reorder point.",
+                entity_type="inventory",
+                entity_id=inventory.id,
+                payload={"store_id": str(store_id), "product_id": str(product_id)},
+            )
+            self.repository.session.add(notification)
+            await self.repository.session.flush()
+            self.repository.session.add(
+                OutboxEvent(
+                    merchant_id=merchant_id,
+                    aggregate_type="notification",
+                    aggregate_id=notification.id,
+                    event_type=EventType.NOTIFICATION_CREATED,
+                    payload={
+                        "notification_id": str(notification.id),
+                        "notification_type": notification.notification_type,
+                        "entity_type": "inventory",
+                        "entity_id": str(inventory.id),
+                    },
+                )
+            )
         return {"inventory_id": inventory.id, "quantity_on_hand": inventory.quantity_on_hand}

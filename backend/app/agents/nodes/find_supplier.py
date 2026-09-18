@@ -10,6 +10,7 @@ from app.domain.entities import PurchaseRequest
 
 async def find_supplier(state: PurchaseWorkflowState, services: WorkflowServices) -> dict:
     request = PurchaseRequest(
+        request_id=state["request_id"],
         sku=state["sku"],
         quantity=Decimal(str(state["required_quantity"])),
         unit=state["unit"],

@@ -24,6 +24,9 @@ class EventType(StrEnum):
     VOICE_SESSION_STARTED = "VOICE_SESSION_STARTED"
     VOICE_TRANSCRIPT_FINAL = "VOICE_TRANSCRIPT_FINAL"
     A2A_MESSAGE_RECEIVED = "A2A_MESSAGE_RECEIVED"
+    INVENTORY_UPDATED = "INVENTORY_UPDATED"
+    NEGOTIATION_UPDATED = "NEGOTIATION_UPDATED"
+    NOTIFICATION_CREATED = "NOTIFICATION_CREATED"
 
 
 class DomainEvent(BaseModel):
@@ -32,6 +35,13 @@ class DomainEvent(BaseModel):
     aggregate_type: str
     aggregate_id: UUID
     merchant_id: UUID | None = None
-    data: dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime = Field(default_factory=utc_now)
+    correlation_id: str | None = None
     trace_id: str | None = None
+    version: int = Field(default=1, ge=1)
+
+    @property
+    def data(self) -> dict[str, Any]:
+        """Backward-compatible internal alias while the public envelope uses payload."""
+        return self.payload

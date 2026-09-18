@@ -7,6 +7,10 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.application.services.activity_service import (
+    NullWorkflowActivityRecorder,
+    WorkflowActivityRecorder,
+)
 from app.application.services.approval_service import ApprovalService
 from app.application.services.negotiation_service import NegotiationService
 from app.application.services.order_service import OrderService
@@ -24,6 +28,7 @@ from app.domain.enums import ApprovalStatus
 from app.infrastructure.db.repositories.approvals import ApprovalRepository
 
 workflow_request_context: ContextVar[str | None] = ContextVar("workflow_request_id", default=None)
+workflow_revision_context: ContextVar[int] = ContextVar("workflow_revision", default=1)
 
 
 class ApprovalAuthority(Protocol):
@@ -50,6 +55,9 @@ class WorkflowServices:
     transaction_executor: TransactionExecutor
     negotiation: NegotiationService = field(default_factory=NegotiationService)
     risk: RiskService = field(default_factory=RiskService)
+    activity_recorder: WorkflowActivityRecorder = field(
+        default_factory=NullWorkflowActivityRecorder
+    )
 
     def supplier(self, supplier_id: UUID) -> SupplierAdapter:
         for adapter in self.suppliers:
@@ -196,7 +204,11 @@ class DatabaseApprovalAuthority:
                 algorithm=self.algorithm,
                 ttl_minutes=self.ttl_minutes,
             )
-            row, token = await service.create(proposal)
+            row, token = await service.create(
+                proposal,
+                revision=workflow_revision_context.get(),
+                correlation_id=workflow_request_context.get(),
+            )
             row.workflow_request_id = workflow_request_context.get()
             record = self._record(row)
         return record, token

@@ -40,7 +40,7 @@ class RestSupplierAdapter:
 
     @staticmethod
     def _purchase_request(request: PurchaseRequest) -> dict[str, Any]:
-        return request.model_dump(mode="json")
+        return request.model_dump(mode="json", exclude={"request_id"})
 
     async def _post(self, path: str, payload: dict, idempotency_key: str) -> dict:
         headers = {"Idempotency-Key": idempotency_key}

@@ -297,7 +297,13 @@ class VoicePipeline:
             yield VoiceEvent(
                 type=VoiceEventType.AUDIO_START,
                 language_code=session.language_code,
-                metadata={"text": response},
+                audio_content_type=f"audio/{getattr(self.provider, 'tts_codec', 'unknown')}",
+                metadata={
+                    "text": response,
+                    "codec": getattr(self.provider, "tts_codec", "unknown"),
+                    "sample_rate": getattr(self.provider, "tts_sample_rate", None),
+                    "channels": 1,
+                },
             )
             async for audio_event in self.provider.synthesize(
                 response, language_code=session.language_code

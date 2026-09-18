@@ -1,6 +1,26 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vyapaar_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vyapaar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-vyapaar}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - vyapaar_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vyapaar} -d ${POSTGRES_DB:-vyapaar}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   redis:
     image: redis:8.2.1-alpine
+    container_name: vyapaar_redis
+    restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -13,4 +33,5 @@ services:
       retries: 10
 
 volumes:
+  vyapaar_postgres_data:
   vyapaar_redis_data:

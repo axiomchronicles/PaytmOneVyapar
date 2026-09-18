@@ -26,9 +26,11 @@ class User(UUIDPrimaryKey, Timestamped, Base):
 
     merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
     email: Mapped[str] = mapped_column(String(320), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(40), default="merchant")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Merchant(UUIDPrimaryKey, Timestamped, Base):
@@ -166,15 +168,22 @@ class OrderItem(UUIDPrimaryKey, Timestamped, Base):
 
 class Negotiation(UUIDPrimaryKey, Timestamped, Base):
     __tablename__ = "negotiations"
+    __table_args__ = (
+        Index("ix_negotiations_merchant_status_created", "merchant_id", "status", "created_at"),
+    )
 
     merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    store_id: Mapped[UUID | None] = mapped_column(ForeignKey("stores.id"), index=True)
     supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id"), index=True)
     correlation_id: Mapped[UUID] = mapped_column(unique=True, index=True)
+    workflow_request_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    proposal_id: Mapped[UUID | None] = mapped_column(index=True)
     sku: Mapped[str] = mapped_column(String(100), index=True)
     status: Mapped[str] = mapped_column(String(40), index=True)
     round_count: Mapped[int] = mapped_column(Integer, default=0)
     constraints: Mapped[dict[str, Any]] = mapped_column(JSON)
     history: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    current_quote: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
 
 class AgentSession(UUIDPrimaryKey, Timestamped, Base):
@@ -271,6 +280,7 @@ class A2AAgent(UUIDPrimaryKey, Timestamped, Base):
     endpoint: Mapped[str] = mapped_column(String(500))
     public_key: Mapped[str | None] = mapped_column(Text)
     shared_secret_ref: Mapped[str | None] = mapped_column(String(200))
+    supplier_id: Mapped[UUID | None] = mapped_column(ForeignKey("suppliers.id"), index=True)
     allowed_intents: Mapped[list[str]] = mapped_column(JSON, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -282,8 +292,13 @@ class A2AMessage(UUIDPrimaryKey, Timestamped, Base):
         UniqueConstraint("sender_agent_id", "nonce"),
         UniqueConstraint("idempotency_key"),
         Index("ix_a2a_messages_correlation_created", "correlation_id", "created_at"),
+        Index("ix_a2a_messages_merchant_created", "merchant_id", "created_at"),
     )
 
+    merchant_id: Mapped[UUID | None] = mapped_column(ForeignKey("merchants.id"), index=True)
+    supplier_id: Mapped[UUID | None] = mapped_column(ForeignKey("suppliers.id"), index=True)
+    order_id: Mapped[UUID | None] = mapped_column(ForeignKey("orders.id"), index=True)
+    negotiation_id: Mapped[UUID | None] = mapped_column(ForeignKey("negotiations.id"), index=True)
     message_id: Mapped[UUID] = mapped_column(index=True)
     correlation_id: Mapped[UUID] = mapped_column(index=True)
     trace_id: Mapped[str] = mapped_column(String(64), index=True)
@@ -291,6 +306,7 @@ class A2AMessage(UUIDPrimaryKey, Timestamped, Base):
     receiver_agent_id: Mapped[UUID] = mapped_column(index=True)
     intent: Mapped[str] = mapped_column(String(80), index=True)
     direction: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(40), default="RECORDED", index=True)
     nonce: Mapped[str] = mapped_column(String(128))
     idempotency_key: Mapped[str] = mapped_column(String(128), index=True)
     envelope: Mapped[dict[str, Any]] = mapped_column(JSON)
@@ -330,12 +346,18 @@ class ChannelMessage(UUIDPrimaryKey, Timestamped, Base):
 
 class OutboxEvent(UUIDPrimaryKey, Timestamped, Base):
     __tablename__ = "outbox_events"
+    __table_args__ = (
+        Index("ix_outbox_pending_created", "published_at", "created_at"),
+    )
 
+    merchant_id: Mapped[UUID | None] = mapped_column(ForeignKey("merchants.id"), index=True)
     aggregate_type: Mapped[str] = mapped_column(String(100), index=True)
     aggregate_id: Mapped[UUID] = mapped_column(index=True)
     event_type: Mapped[str] = mapped_column(String(100), index=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
     trace_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    correlation_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    event_version: Mapped[int] = mapped_column(Integer, default=1)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     last_error: Mapped[str | None] = mapped_column(Text)
@@ -351,3 +373,94 @@ class IdempotencyKey(UUIDPrimaryKey, Timestamped, Base):
     status: Mapped[str] = mapped_column(String(30), default="PROCESSING")
     response: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class RefreshSession(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "refresh_sessions"
+    __table_args__ = (
+        UniqueConstraint("token_hash"),
+        Index("ix_refresh_sessions_user_expires", "user_id", "expires_at"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    replaced_by_id: Mapped[UUID | None] = mapped_column(ForeignKey("refresh_sessions.id"))
+    device_name: Mapped[str | None] = mapped_column(String(120))
+
+
+class OtpChallenge(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "otp_challenges"
+    __table_args__ = (
+        Index("ix_otp_identifier_created", "identifier_hash", "created_at"),
+        Index("ix_otp_expiry_consumed", "expires_at", "consumed_at"),
+    )
+
+    identifier: Mapped[str] = mapped_column(String(320))
+    identifier_hash: Mapped[str] = mapped_column(String(64), index=True)
+    purpose: Mapped[str] = mapped_column(String(30), index=True)
+    otp_hash: Mapped[str] = mapped_column(String(255))
+    request_ip_hash: Mapped[str] = mapped_column(String(64), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    resend_available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=5)
+    resend_count: Mapped[int] = mapped_column(Integer, default=0)
+    max_resends: Mapped[int] = mapped_column(Integer, default=3)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class OAuthChallenge(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "oauth_challenges"
+    __table_args__ = (Index("ix_oauth_challenge_expiry", "expires_at", "consumed_at"),)
+
+    provider: Mapped[str] = mapped_column(String(30), index=True)
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    nonce_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class OAuthIdentity(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "oauth_identities"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_subject"),
+        UniqueConstraint("user_id", "provider"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(30), index=True)
+    provider_subject: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str | None] = mapped_column(String(320), index=True)
+
+
+class OrderEvent(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "order_events"
+    __table_args__ = (Index("ix_order_events_order_created", "order_id", "created_at"),)
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    order_id: Mapped[UUID] = mapped_column(ForeignKey("orders.id"), index=True)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class Notification(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "notifications"
+    __table_args__ = (
+        Index("ix_notifications_merchant_read_created", "merchant_id", "is_read", "created_at"),
+    )
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    notification_type: Mapped[str] = mapped_column(String(50), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    entity_type: Mapped[str | None] = mapped_column(String(80), index=True)
+    entity_id: Mapped[UUID | None] = mapped_column(index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -4,6 +4,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
+from typing import Protocol
 from uuid import UUID, uuid4, uuid5
 
 from app.a2a.schemas import (
@@ -25,6 +26,17 @@ MOCK_NAMESPACE = UUID("c0ffee00-0000-4000-8000-000000000001")
 BUYER_AGENT_ID = UUID("11111111-1111-4111-8111-111111111111")
 
 
+class A2ARecorder(Protocol):
+    async def record(
+        self,
+        envelope: A2AEnvelope,
+        *,
+        direction: str,
+        merchant_id: UUID,
+        supplier_id: UUID,
+    ) -> None: ...
+
+
 @dataclass(frozen=True)
 class CatalogItem:
     sku: str
@@ -43,10 +55,12 @@ class MockSupplierAdapter:
         fail_every: int = 0,
         signing_secret: str | None = None,
         buyer_agent_id: UUID = BUYER_AGENT_ID,
+        message_recorder: A2ARecorder | None = None,
     ) -> None:
         self.name = name
         self.supplier_id = uuid5(MOCK_NAMESPACE, name)
         self.buyer_agent_id = buyer_agent_id
+        self.message_recorder = message_recorder
         self.signing_secret = signing_secret or "development-a2a-secret-change-me"  # noqa: S105
         self.catalog = catalog or {
             "COLD-COLA-300": CatalogItem("COLD-COLA-300", Decimal("240"), Decimal("470"), 1)
@@ -57,25 +71,35 @@ class MockSupplierAdapter:
         self._orders: dict[str, OrderResult] = {}
         self._quotes: dict[str, SupplierQuote] = {}
         self._message_results: dict[str, A2AEnvelope] = {}
+        self._quote_correlations: dict[str, UUID] = {}
+        self._quote_merchants: dict[str, UUID] = {}
+        self._pending_messages: dict[str, list[tuple[A2AEnvelope, str, UUID]]] = {}
 
     async def discover(self, request: PurchaseRequest) -> list[SupplierQuote]:
         return [await self.quote(request)]
 
     async def quote(self, request: PurchaseRequest) -> SupplierQuote:
-        payload = PurchaseRequestPayload(**request.model_dump())
+        payload = PurchaseRequestPayload(**request.model_dump(exclude={"request_id"}))
+        request_scope = request.request_id or str(request.quantity)
         response = await self._exchange(
             A2AIntent.PURCHASE_REQUEST,
             payload.model_dump(mode="json", exclude={"intent"}),
-            idempotency_key=f"quote:{request.merchant_id}:{request.sku}:{request.quantity}",
+            idempotency_key=(
+                f"quote:{request.merchant_id}:{request.sku}:{request_scope}:{request.quantity}"
+            ),
+            merchant_id=request.merchant_id,
         )
         if response.intent != A2AIntent.QUOTE:
             raise SupplierUnavailableError("Mock supplier rejected the purchase request")
         typed = QuotePayload.model_validate({"intent": response.intent, **response.payload})
-        return SupplierQuote(
+        quote = SupplierQuote(
             supplier_id=self.supplier_id,
             supplier_name=self.name,
             **typed.model_dump(exclude={"intent"}),
         )
+        self._quote_correlations[quote.quote_id] = response.correlation_id
+        self._quote_merchants[quote.quote_id] = request.merchant_id
+        return quote
 
     async def counter_offer(
         self, quote: SupplierQuote, *, unit_price: float, quantity: float, idempotency_key: str
@@ -90,6 +114,8 @@ class MockSupplierAdapter:
             A2AIntent.COUNTER_OFFER,
             payload.model_dump(mode="json", exclude={"intent"}),
             idempotency_key=idempotency_key,
+            merchant_id=self._quote_merchants.get(quote.quote_id),
+            correlation_id=self._quote_correlations.get(quote.quote_id),
         )
         if response.intent == A2AIntent.OFFER_REJECTED:
             return None
@@ -112,6 +138,9 @@ class MockSupplierAdapter:
             A2AIntent.OFFER_ACCEPTED,
             payload.model_dump(mode="json", exclude={"intent"}),
             idempotency_key=idempotency_key,
+            merchant_id=proposal.merchant_id,
+            correlation_id=self._quote_correlations.get(proposal.quote_id),
+            defer_recording=True,
         )
         confirmation = OrderConfirmationPayload.model_validate(
             {"intent": response.intent, **response.payload}
@@ -198,23 +227,60 @@ class MockSupplierAdapter:
         ]
 
     async def _exchange(
-        self, intent: A2AIntent, payload: dict, *, idempotency_key: str
+        self,
+        intent: A2AIntent,
+        payload: dict,
+        *,
+        idempotency_key: str,
+        merchant_id: UUID | None,
+        correlation_id: UUID | None = None,
+        defer_recording: bool = False,
     ) -> A2AEnvelope:
         request = self._envelope(
             intent=intent,
             payload=payload,
             sender=self.buyer_agent_id,
             receiver=self.supplier_id,
-            correlation_id=uuid5(MOCK_NAMESPACE, idempotency_key),
+            correlation_id=correlation_id or uuid5(MOCK_NAMESPACE, idempotency_key),
             idempotency_key=idempotency_key,
         )
+        if merchant_id is not None and defer_recording:
+            self._pending_messages.setdefault(idempotency_key, []).append(
+                (request, "OUTBOUND", merchant_id)
+            )
+        elif merchant_id is not None and self.message_recorder is not None:
+            await self.message_recorder.record(
+                request,
+                direction="OUTBOUND",
+                merchant_id=merchant_id,
+                supplier_id=self.supplier_id,
+            )
         response = await self.handle_envelope(request)
         verify_envelope(
             response,
             secret=self.signing_secret,
             expected_receiver_id=str(self.buyer_agent_id),
         )
+        if merchant_id is not None and defer_recording:
+            self._pending_messages.setdefault(idempotency_key, []).append(
+                (response, "INBOUND", merchant_id)
+            )
+        elif merchant_id is not None and self.message_recorder is not None:
+            await self.message_recorder.record(
+                response,
+                direction="INBOUND",
+                merchant_id=merchant_id,
+                supplier_id=self.supplier_id,
+            )
         return response
+
+    def correlation_id_for_quote(self, quote_id: str) -> UUID | None:
+        return self._quote_correlations.get(quote_id)
+
+    def pop_pending_messages(
+        self, idempotency_key: str
+    ) -> list[tuple[A2AEnvelope, str, UUID]]:
+        return self._pending_messages.pop(idempotency_key, [])
 
     def _envelope(
         self,

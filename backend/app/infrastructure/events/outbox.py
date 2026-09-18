@@ -31,8 +31,12 @@ class OutboxPublisher:
                         event_type=EventType(row.event_type),
                         aggregate_type=row.aggregate_type,
                         aggregate_id=row.aggregate_id,
-                        data=row.payload,
+                        merchant_id=row.merchant_id,
+                        payload=row.payload,
+                        occurred_at=row.created_at,
+                        correlation_id=row.correlation_id,
                         trace_id=row.trace_id,
+                        version=row.event_version,
                     )
                 )
             except Exception as exc:

@@ -7,9 +7,18 @@ import httpx
 import structlog
 
 from app.channels.voice.protocol import VoiceEvent, VoiceEventType
-from app.core.errors import ProviderError
+from app.core.errors import ProviderError, SarvamAuthenticationError
 
 logger = structlog.get_logger()
+
+
+def _is_authentication_error(error: object) -> bool:
+    text = str(error).lower()
+    status = getattr(error, "status_code", None)
+    return status in {401, 403} or any(
+        marker in text
+        for marker in ("invalid_subscription_key", "invalid credentials", "authentication")
+    )
 
 
 def clean_text_for_natural_voice(text: str) -> str:
@@ -111,8 +120,16 @@ class SarvamVoiceProvider:
                                 },
                             )
                         elif event == "error" and message.is_fatal:
+                            if _is_authentication_error(message.code):
+                                raise SarvamAuthenticationError()
+                            logger.error(
+                                "sarvam_stt_provider_error",
+                                provider_code=str(message.code)[:80],
+                                provider_status=getattr(message, "status_code", None),
+                                provider_message=str(getattr(message, "message", ""))[:200],
+                            )
                             raise ProviderError(
-                                "Sarvam realtime STT failed", details={"code": message.code}
+                                "Voice transcription provider failed"
                             )
                         elif event == "session.end":
                             break
@@ -120,6 +137,15 @@ class SarvamVoiceProvider:
                     if not sender.done():
                         sender.cancel()
                     await asyncio.gather(sender, return_exceptions=True)
+        except SarvamAuthenticationError:
+            raise
+        except ProviderError:
+            raise
+        except Exception as exc:
+            if _is_authentication_error(exc):
+                raise SarvamAuthenticationError() from exc
+            logger.error("sarvam_stt_failed", error_type=type(exc).__name__)
+            raise ProviderError("Voice transcription provider failed") from exc
         finally:
             await http_client.aclose()
 
@@ -190,7 +216,10 @@ class SarvamVoiceProvider:
                             details={"error": getattr(err_data, "message", str(message))},
                         )
         except Exception as exc:
-            logger.warning("sarvam_streaming_tts_fallback", error=str(exc))
+            if _is_authentication_error(exc):
+                logger.error("sarvam_authentication_failed", provider="sarvam")
+                raise SarvamAuthenticationError() from exc
+            logger.warning("sarvam_streaming_tts_fallback", error_type=type(exc).__name__)
             # Resilient fallback: Stream via HTTP convert_stream for uninterrupted delivery
             try:
                 stream = await client.text_to_speech.convert_stream(
@@ -215,6 +244,9 @@ class SarvamVoiceProvider:
                             metadata={"fallback": True, "speaker": self.tts_speaker},
                         )
             except Exception as fallback_exc:
+                if _is_authentication_error(fallback_exc):
+                    logger.error("sarvam_authentication_failed", provider="sarvam")
+                    raise SarvamAuthenticationError() from fallback_exc
                 raise ProviderError("Sarvam TTS synthesis failed") from fallback_exc
         finally:
             await http_client.aclose()

@@ -10,6 +10,7 @@ from app.domain.entities import PurchaseRequest, SupplierQuote
 
 async def negotiate(state: PurchaseWorkflowState, services: WorkflowServices) -> dict:
     request = PurchaseRequest(
+        request_id=state["request_id"],
         sku=state["sku"],
         quantity=Decimal(str(state["required_quantity"])),
         unit=state["unit"],
@@ -57,13 +58,23 @@ async def negotiate(state: PurchaseWorkflowState, services: WorkflowServices) ->
                     "status": "ACCEPTED",
                 }
             )
-            return {
+            result = {
                 "selected_supplier": chosen.model_dump(mode="json"),
                 "negotiated_price": float(chosen.unit_price),
                 "negotiation_history": history,
                 "failure_reason": "",
             }
+            adapter = services.supplier(chosen.supplier_id)
+            correlation = getattr(adapter, "correlation_id_for_quote", lambda _: None)(
+                chosen.quote_id
+            )
+            if correlation is not None:
+                result["negotiation_correlation_id"] = str(correlation)
+            await services.activity_recorder.record_negotiation({**state, **result})
+            return result
         history.append(
             {"supplier_id": str(quote.supplier_id), "status": "INVALID", "reasons": failures}
         )
-    return {"negotiation_history": history, "failure_reason": "negotiation_failed"}
+    result = {"negotiation_history": history, "failure_reason": "negotiation_failed"}
+    await services.activity_recorder.record_negotiation({**state, **result})
+    return result

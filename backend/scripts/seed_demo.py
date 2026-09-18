@@ -47,6 +47,8 @@ async def seed(session: AsyncSession) -> None:
             email="merchant@vyapaar.local",
             password_hash=hash_password("demo-change-me"),
             role="owner",
+            is_email_verified=True,
+            is_phone_verified=True,
         ),
         Store(
             id=STORE_ID,
@@ -101,6 +103,7 @@ async def seed(session: AsyncSession) -> None:
             name="bharat-beverage-mock-agent",
             endpoint="http://localhost:8000/api/v1/a2a/mock-supplier/messages",
             shared_secret_ref="env:A2A_SIGNING_SECRET",
+            supplier_id=supplier.supplier_id,
             allowed_intents=["QUOTE", "OFFER_REJECTED", "ORDER_CONFIRMATION"],
         ),
     ]

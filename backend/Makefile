@@ -1,10 +1,16 @@
-.PHONY: install dev redis migrate seed worker test lint format demo
+.PHONY: install dev infra db redis migrate seed worker test lint format demo
 
 install:
 	uv sync --frozen
 
 dev:
 	uv run uvicorn app.main:app --reload
+
+infra:
+	docker compose up -d
+
+db:
+	docker compose up -d postgres
 
 redis:
 	docker compose up -d redis

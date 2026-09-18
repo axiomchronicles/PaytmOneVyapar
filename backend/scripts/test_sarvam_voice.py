@@ -455,7 +455,11 @@ async def main() -> None:
 
     raw_sarvam_provider: SarvamVoiceProvider | None = None
     if is_valid_sarvam_key:
-        print(f"🔑 Using Active Sarvam API Key: {api_key[:6]}... (bulbul:v3, female speaker: {args.speaker}, temp: {args.temperature})")
+        print(
+            "🔑 Sarvam credential present "
+            f"(length={len(api_key)}, source={'--api-key' if args.api_key else 'SARVAM_API_KEY'}, "
+            f"bulbul:v3, female speaker: {args.speaker}, temp: {args.temperature})"
+        )
         raw_sarvam_provider = SarvamVoiceProvider(
             api_key=api_key,
             stt_model=settings.sarvam_stt_model,
@@ -468,17 +472,21 @@ async def main() -> None:
             tts_bitrate=settings.sarvam_tts_bitrate,
         )
     else:
-        print("\nℹ️  SARVAM_API_KEY is currently a placeholder.")
-        print("💡 Pass --api-key <YOUR_KEY> to call Sarvam AI Cloud API directly.")
-        print("🔊 Using native female voice engines (Lekha, Piya, Vani, Geeta) with natural speech rate!")
+        print("\nVoice unavailable: SARVAM_API_KEY is not configured with a live credential.")
+        print("No simulated voice fallback was run.")
+        return
 
     languages_to_run = list(LANGUAGE_CONFIGS.keys()) if args.lang == "all" else [args.lang]
 
     for lang in languages_to_run:
-        await run_scenario_for_language(lang, raw_sarvam_provider=raw_sarvam_provider, use_sarvam=is_valid_sarvam_key)
+        await run_scenario_for_language(
+            lang,
+            raw_sarvam_provider=raw_sarvam_provider,
+            use_sarvam=True,
+        )
 
     print("\n" + "=" * 70)
-    print("🎉 ALL REQUESTED FEMALE VOICE SCENARIOS TESTED SUCCESSFULLY!")
+    print("LIVE SARVAM VOICE SCENARIOS COMPLETED")
     print("=" * 70)
 
 

@@ -11,9 +11,9 @@ from app.core.security import (
     utc_now,
 )
 from app.domain.entities import PurchaseProposal
-from app.domain.enums import ApprovalStatus
+from app.domain.enums import ApprovalStatus, NotificationType
 from app.domain.events import EventType
-from app.infrastructure.db.models import Approval, AuditLog, OutboxEvent
+from app.infrastructure.db.models import Approval, AuditLog, Notification, OutboxEvent
 from app.infrastructure.db.repositories.approvals import ApprovalRepository
 
 
@@ -32,7 +32,12 @@ class ApprovalService:
         self.ttl_minutes = ttl_minutes
 
     async def create(
-        self, proposal: PurchaseProposal, *, channel: str = "API"
+        self,
+        proposal: PurchaseProposal,
+        *,
+        channel: str = "API",
+        revision: int = 1,
+        correlation_id: str | None = None,
     ) -> tuple[Approval, str]:
         payload = proposal.canonical_payload()
         order_hash = canonical_order_hash(payload)
@@ -45,14 +50,48 @@ class ApprovalService:
             nonce=secrets.token_urlsafe(24),
             expires_at=utc_now() + timedelta(minutes=self.ttl_minutes),
             channel=channel,
+            revision=revision,
         )
         await self.repository.add(approval)
         self.repository.session.add(
             OutboxEvent(
+                merchant_id=proposal.merchant_id,
                 aggregate_type="approval",
                 aggregate_id=approval.id,
                 event_type=EventType.APPROVAL_REQUIRED,
-                payload={"approval_id": str(approval.id), "order_hash": order_hash},
+                correlation_id=correlation_id,
+                payload={
+                    "approval_id": str(approval.id),
+                    "proposal_id": str(approval.proposal_id),
+                    "revision": approval.revision,
+                    "status": ApprovalStatus.PENDING,
+                },
+            )
+        )
+        notification = Notification(
+            merchant_id=proposal.merchant_id,
+            notification_type=NotificationType.APPROVAL_REQUIRED,
+            title="Purchase approval required",
+            body=f"Review the purchase proposal for {proposal.sku}.",
+            entity_type="approval",
+            entity_id=approval.id,
+            payload={"proposal_id": str(proposal.proposal_id)},
+        )
+        self.repository.session.add(notification)
+        await self.repository.session.flush()
+        self.repository.session.add(
+            OutboxEvent(
+                merchant_id=proposal.merchant_id,
+                aggregate_type="notification",
+                aggregate_id=notification.id,
+                event_type=EventType.NOTIFICATION_CREATED,
+                correlation_id=correlation_id,
+                payload={
+                    "notification_id": str(notification.id),
+                    "notification_type": notification.notification_type,
+                    "entity_type": "approval",
+                    "entity_id": str(approval.id),
+                },
             )
         )
         self.repository.session.add(
@@ -63,6 +102,7 @@ class ApprovalService:
                 action="approval.requested",
                 resource_type="approval",
                 resource_id=str(approval.id),
+                trace_id=correlation_id,
                 metadata_={"order_hash": order_hash},
             )
         )
@@ -80,6 +120,7 @@ class ApprovalService:
         approval.decided_by_user_id = user_id
         self.repository.session.add(
             OutboxEvent(
+                merchant_id=approval.merchant_id,
                 aggregate_type="approval",
                 aggregate_id=approval.id,
                 event_type=EventType.APPROVAL_GRANTED,
@@ -98,6 +139,7 @@ class ApprovalService:
         approval.decided_by_user_id = user_id
         self.repository.session.add(
             OutboxEvent(
+                merchant_id=approval.merchant_id,
                 aggregate_type="approval",
                 aggregate_id=approval.id,
                 event_type=EventType.APPROVAL_REJECTED,
@@ -139,7 +181,12 @@ class ApprovalService:
             delivery_at=payload["delivery_at"],
             quote_id=payload["quote_id"],
         )
-        return await self.create(revised, channel=old.channel)
+        return await self.create(
+            revised,
+            channel=old.channel,
+            revision=old.revision + 1,
+            correlation_id=old.workflow_request_id,
+        )
 
     async def mark_modified(
         self, approval_id: UUID, *, merchant_id: UUID, user_id: UUID, token: str

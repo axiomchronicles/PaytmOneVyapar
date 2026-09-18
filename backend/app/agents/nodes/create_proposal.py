@@ -2,7 +2,7 @@ from decimal import Decimal
 from uuid import UUID, uuid5
 
 from app.agents.nodes.risk_check import PROPOSAL_NAMESPACE
-from app.agents.services import WorkflowServices
+from app.agents.services import WorkflowServices, workflow_revision_context
 from app.agents.state import PurchaseWorkflowState
 from app.core.security import canonical_order_hash
 from app.domain.entities import PurchaseProposal, SupplierQuote
@@ -23,8 +23,15 @@ async def create_proposal(state: PurchaseWorkflowState, services: WorkflowServic
         delivery_at=quote.delivery_at,
         quote_id=quote.quote_id,
     )
-    approval, token = await services.approval_authority.request(proposal)
+    revision_token = workflow_revision_context.set(revision)
+    try:
+        approval, token = await services.approval_authority.request(proposal)
+    finally:
+        workflow_revision_context.reset(revision_token)
     payload = proposal.canonical_payload()
+    await services.activity_recorder.record_negotiation(
+        {**state, "proposal": payload, "approval_id": str(approval.approval_id)}
+    )
     return {
         "proposal": payload,
         "order_hash": canonical_order_hash(payload),

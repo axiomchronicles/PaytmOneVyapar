@@ -29,6 +29,7 @@ class ForecastResult(DomainModel):
 
 
 class PurchaseRequest(DomainModel):
+    request_id: str | None = None
     sku: str
     quantity: Decimal = Field(gt=0)
     unit: str

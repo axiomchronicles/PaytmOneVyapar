@@ -51,3 +51,19 @@ class TransactionStatus(StrEnum):
     PENDING = "PENDING"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
+
+
+class OtpPurpose(StrEnum):
+    LOGIN = "LOGIN"
+    REGISTRATION = "REGISTRATION"
+
+
+class OAuthProvider(StrEnum):
+    GOOGLE = "GOOGLE"
+    APPLE = "APPLE"
+
+
+class NotificationType(StrEnum):
+    APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
+    ORDER_UPDATE = "ORDER_UPDATE"
+    INVENTORY_ALERT = "INVENTORY_ALERT"
