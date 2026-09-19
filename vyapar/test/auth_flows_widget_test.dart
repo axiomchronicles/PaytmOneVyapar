@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:vyapar/core/auth/auth_session.dart';
 import 'package:vyapar/core/auth/auth_storage.dart';
 import 'package:vyapar/core/auth/token_store.dart';
 import 'package:vyapar/design_system/theme/app_theme.dart';
@@ -10,7 +12,10 @@ import 'package:vyapar/features/auth/data/oauth_client.dart';
 import 'package:vyapar/features/auth/models/auth_models.dart';
 import 'package:vyapar/features/auth/presentation/otp_screen.dart';
 import 'package:vyapar/features/auth/presentation/registration_screen.dart';
+import 'package:vyapar/app/router.dart';
+import 'package:vyapar/features/auth/presentation/sign_in_screen.dart';
 import 'package:vyapar/features/auth/providers/auth_provider.dart';
+import 'package:vyapar/l10n/app_localizations.dart';
 
 class _OtpState extends OtpFlowController {
   @override
@@ -43,6 +48,11 @@ class _RegistrationState extends RegistrationController {
     required String businessName,
     required String storeName,
     String? password,
+    String role = 'merchant',
+    String? gstin,
+    String? pan,
+    String? category,
+    Map<String, dynamic>? address,
   }) async {}
 }
 
@@ -79,7 +89,22 @@ class _OAuthClient implements MobileOAuthClient {
   }
 }
 
-Widget _app(Widget child) => MaterialApp(theme: AppTheme.light, home: child);
+Widget _app(Widget child) => MaterialApp(
+  theme: AppTheme.light,
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ],
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: child,
+);
+
+class _AuthState extends AuthController {
+  @override
+  Future<AuthSession> build() async => const AuthSession.unauthenticated();
+}
 
 void main() {
   testWidgets('OTP screen renders a server-issued challenge', (tester) async {
@@ -115,6 +140,57 @@ void main() {
     expect(find.byKey(const ValueKey('registration_store')), findsOneWidget);
     expect(find.byKey(const ValueKey('registration_password')), findsOneWidget);
   });
+
+  testWidgets(
+    'Sign-in screen displays separate Merchant and Supplier registration options',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [authControllerProvider.overrideWith(_AuthState.new)],
+          child: _app(const SignInScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Or Register New Account'), findsOneWidget);
+      expect(find.byKey(const ValueKey('create_account_button')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('supplier_registration_button')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Merchant'), findsWidgets);
+      expect(find.textContaining('Supplier'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'SupplierRegistrationScreen renders wholesale fields without any role tab menu',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            pendingRegistrationProvider.overrideWith(_PendingRegistration.new),
+            registrationControllerProvider.overrideWith(_RegistrationState.new),
+          ],
+          child: _app(const SupplierRegistrationScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Supplier Registration'), findsOneWidget);
+      expect(find.text('B2B Wholesale Distributor'), findsOneWidget);
+      expect(find.text('Wholesale Supply Category'), findsOneWidget);
+      expect(find.text('FMCG Distribution'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('submit_supplier_registration_button')),
+        findsOneWidget,
+      );
+      expect(find.byType(ChoiceChip), findsNothing);
+    },
+  );
 
   test(
     'OAuth flow preserves server state and creates registration state',

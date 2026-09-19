@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vyapar/app/app.dart';
+import 'package:vyapar/app/router.dart';
 import 'package:vyapar/core/auth/auth_session.dart';
 import 'package:vyapar/core/networking/realtime_event.dart';
 import 'package:vyapar/core/networking/realtime_provider.dart';
@@ -114,4 +115,85 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'unauthenticated user can access /register/supplier without being bounced to welcome',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _AuthState(const AuthSession.unauthenticated()),
+            ),
+            realtimeEventsProvider.overrideWith(
+              (ref) => const Stream<RealtimeEvent>.empty(),
+            ),
+            merchantControllerProvider.overrideWith(_MerchantState.new),
+            inventoryControllerProvider.overrideWith(_InventoryState.new),
+            recommendationControllerProvider.overrideWith(
+              _RecommendationState.new,
+            ),
+            analyticsControllerProvider.overrideWith(_AnalyticsState.new),
+          ],
+          child: const VyaparApp(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final context = tester.element(find.byType(VyaparApp));
+      final router = ProviderScope.containerOf(context).read(appRouterProvider);
+
+      router.go('/register/supplier');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(router.state.uri.toString(), '/register/supplier');
+      expect(find.text('Your business, one step ahead'), findsNothing);
+      expect(find.textContaining('wholesale supplier'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'authenticated supplier is redirected to /supplier-home when opening /register/supplier',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _AuthState(
+                const AuthSession.authenticated(
+                  role: 'supplier',
+                  accountType: 'supplier',
+                  businessName: 'Metro Wholesale',
+                ),
+              ),
+            ),
+            realtimeEventsProvider.overrideWith(
+              (ref) => const Stream<RealtimeEvent>.empty(),
+            ),
+            merchantControllerProvider.overrideWith(_MerchantState.new),
+            inventoryControllerProvider.overrideWith(_InventoryState.new),
+            recommendationControllerProvider.overrideWith(
+              _RecommendationState.new,
+            ),
+            analyticsControllerProvider.overrideWith(_AnalyticsState.new),
+          ],
+          child: const VyaparApp(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final context = tester.element(find.byType(VyaparApp));
+      final router = ProviderScope.containerOf(context).read(appRouterProvider);
+
+      router.go('/register/supplier');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('SUPPLIER'), findsOneWidget);
+    },
+  );
 }

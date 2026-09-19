@@ -7,6 +7,7 @@ import 'package:vyapar/core/auth/auth_storage.dart';
 import 'package:vyapar/core/auth/token_store.dart';
 import 'package:vyapar/core/errors/app_failure.dart';
 import 'package:vyapar/features/auth/data/auth_repository.dart';
+import 'package:vyapar/features/auth/models/auth_models.dart';
 import 'package:vyapar/features/auth/providers/auth_provider.dart';
 
 class _FakeAuthRepository extends AuthRepository {
@@ -17,14 +18,53 @@ class _FakeAuthRepository extends AuthRepository {
   final AppFailure? signInError;
 
   @override
-  Future<void> validateSession() async {
+  Future<UserMe> validateSession() async {
     if (validationError case final error?) throw error;
+    return const UserMe(
+      userId: 'test-user-id',
+      merchantId: 'test-merchant-id',
+      role: 'merchant',
+      accountType: 'merchant',
+      email: 'test@vyapaar.local',
+      businessName: 'Test Kirana',
+    );
   }
 
   @override
   Future<void> signIn({required String email, required String password}) async {
     if (signInError case final error?) throw error;
   }
+}
+
+class _SupplierOtpAuthRepository extends AuthRepository {
+  _SupplierOtpAuthRepository() : super(Dio(), TokenStore(MemoryAuthStorage()));
+
+  @override
+  Future<OtpChallenge> requestOtp(
+    String phone, {
+    required bool registration,
+  }) async => OtpChallenge(
+    id: 'supplier-otp-challenge',
+    destination: phone,
+    expiresAt: DateTime(2026, 9, 20),
+    resendAvailableAt: DateTime(2026, 9, 19),
+  );
+
+  @override
+  Future<AuthExchangeResult> verifyOtp({
+    required String challengeId,
+    required String otp,
+  }) async => const AuthExchangeResult(registrationRequired: false);
+
+  @override
+  Future<UserMe> validateSession() async => const UserMe(
+    userId: 'supplier-user-id',
+    merchantId: 'supplier-business-id',
+    role: 'supplier',
+    accountType: 'supplier',
+    email: 'supplier@vyapaar.local',
+    businessName: 'Metro Wholesale',
+  );
 }
 
 void main() {
@@ -108,5 +148,30 @@ void main() {
 
     expect(container.read(authControllerProvider).hasError, isTrue);
     expect(container.read(authControllerProvider).error, same(failure));
+  });
+
+  test('OTP sign-in retains the supplier role before navigation', () async {
+    final storage = MemoryAuthStorage();
+    final container = ProviderContainer(
+      overrides: [
+        authStorageProvider.overrideWithValue(storage),
+        tokenStoreProvider.overrideWithValue(TokenStore(storage)),
+        authRepositoryProvider.overrideWithValue(_SupplierOtpAuthRepository()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.future);
+    await container.read(otpFlowProvider.future);
+
+    await container
+        .read(otpFlowProvider.notifier)
+        .request('919999999999', registration: false);
+    final needsRegistration = await container
+        .read(otpFlowProvider.notifier)
+        .verify('123456', phone: '919999999999');
+
+    expect(needsRegistration, isFalse);
+    expect(container.read(authControllerProvider).value?.role, 'supplier');
+    expect(container.read(authControllerProvider).value?.isSupplier, isTrue);
   });
 }
