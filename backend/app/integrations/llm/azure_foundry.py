@@ -1,5 +1,6 @@
 import time
 from collections.abc import Sequence
+from typing import Any
 
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from pydantic import BaseModel, SecretStr
@@ -37,7 +38,7 @@ class AzureFoundryLLMProvider:
             )
 
     async def structured(
-        self, messages: Sequence[dict[str, str]], schema: type[BaseModel]
+        self, messages: Sequence[dict[str, Any]], schema: type[BaseModel]
     ) -> BaseModel:
         runnable = self.client.with_structured_output(
             schema, method="json_schema", include_raw=True

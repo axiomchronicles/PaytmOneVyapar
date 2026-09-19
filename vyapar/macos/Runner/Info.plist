@@ -4,6 +4,8 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Vyapar uses your microphone only during an active Munim voice session.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vyapar accesses your photos only when you choose a receipt to upload.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>

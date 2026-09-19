@@ -13,6 +13,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.agents.graph import build_purchase_graph
+from app.agents.receipt_graph import ReceiptExtractionWorkflow
 from app.agents.runtime import WorkflowRuntime
 from app.agents.services import (
     DatabaseApprovalAuthority,
@@ -119,6 +120,7 @@ async def lifespan(app: FastAPI):
     app.state.email_provider = None
     app.state.telegram_provider = None
     app.state.llm_provider = build_llm_provider(settings)
+    app.state.receipt_extraction_workflow = ReceiptExtractionWorkflow(app.state.llm_provider)
 
     telegram_delivery = None
     if settings.telegram_bot_token:

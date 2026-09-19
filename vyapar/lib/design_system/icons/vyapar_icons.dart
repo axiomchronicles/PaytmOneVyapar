@@ -51,6 +51,11 @@ abstract final class VyaparIcons {
   static const bulb = HugeIcons.strokeRoundedBulb;
   static const moneyReceive = HugeIcons.strokeRoundedMoneyReceive01;
   static const coins = HugeIcons.strokeRoundedCoins01;
+  static const scan = HugeIcons.strokeRoundedAiScan;
+  static const camera = HugeIcons.strokeRoundedCamera01;
+  static const imageUpload = HugeIcons.strokeRoundedImageUpload;
+  static const add = HugeIcons.strokeRoundedAdd01;
+  static const delete = HugeIcons.strokeRoundedDelete02;
 }
 
 class VyaparIcon extends StatelessWidget {

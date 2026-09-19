@@ -12,6 +12,44 @@ from app.core.errors import ProviderError, SarvamAuthenticationError
 logger = structlog.get_logger()
 
 
+def _patch_websockets_drain_helper() -> None:
+    """Fixes a concurrency bug in websockets.legacy.protocol._drain_helper.
+
+    When multiple tasks call write_frame()/drain() concurrently on a paused connection
+    (e.g., keepalive_ping, pong response to server ping, and audio streaming sends),
+    websockets.legacy asserts that _drain_waiter is None, raising:
+        AssertionError: assert waiter is None or waiter.cancelled()
+    Instead of asserting, concurrent callers should await the existing drain waiter,
+    matching modern websockets (asyncio) behavior.
+    """
+    try:
+        from websockets.legacy.protocol import WebSocketCommonProtocol
+
+        if getattr(WebSocketCommonProtocol, "_drain_helper_patched", False):
+            return
+
+        async def _safe_drain_helper(self: WebSocketCommonProtocol) -> None:
+            if self.connection_lost_waiter.done():
+                raise ConnectionResetError("Connection lost")
+            if not self._paused:
+                return
+            waiter = getattr(self, "_drain_waiter", None)
+            if waiter is not None and not waiter.done():
+                await asyncio.shield(waiter)
+                return
+            waiter = self.loop.create_future()
+            self._drain_waiter = waiter
+            await waiter
+
+        WebSocketCommonProtocol._drain_helper = _safe_drain_helper
+        WebSocketCommonProtocol._drain_helper_patched = True
+    except (ImportError, AttributeError):
+        pass
+
+
+_patch_websockets_drain_helper()
+
+
 def _is_authentication_error(error: object) -> bool:
     text = str(error).lower()
     status = getattr(error, "status_code", None)
@@ -259,15 +297,48 @@ class SarvamVoiceProvider:
             ) as socket:
 
                 async def send_audio() -> None:
-                    async for chunk in audio:
-                        await socket.send_realtime_audio_input(
-                            RealtimeAudioInput(audio=base64.b64encode(chunk).decode())
-                        )
-                    await socket.send_realtime_end(RealtimeEnd())
+                    try:
+                        async for chunk in audio:
+                            if not chunk:
+                                continue
+                            raw_ws = getattr(socket, "_websocket", None)
+                            if raw_ws is not None and getattr(raw_ws, "closed", False):
+                                break
+                            await socket.send_realtime_audio_input(
+                                RealtimeAudioInput(audio=base64.b64encode(chunk).decode())
+                            )
+                        raw_ws = getattr(socket, "_websocket", None)
+                        if raw_ws is not None and not getattr(raw_ws, "closed", False):
+                            await socket.send_realtime_end(RealtimeEnd())
+                    except (asyncio.CancelledError, GeneratorExit):
+                        raise
+                    except Exception as err:
+                        logger.debug("sarvam_send_audio_stopped", error=str(err))
+
+                message_queue: asyncio.Queue[object | None] = asyncio.Queue(maxsize=128)
+
+                async def read_socket() -> None:
+                    try:
+                        async for message in socket:
+                            await message_queue.put(message)
+                    except (asyncio.CancelledError, GeneratorExit):
+                        pass
+                    except Exception as exc:
+                        await message_queue.put(exc)
+                    finally:
+                        await message_queue.put(None)
 
                 sender = asyncio.create_task(send_audio())
+                reader = asyncio.create_task(read_socket())
                 try:
-                    async for message in socket:
+                    while True:
+                        item = await message_queue.get()
+                        if item is None:
+                            break
+                        if isinstance(item, Exception):
+                            raise item
+
+                        message = item
                         event = getattr(message, "event", None)
                         if event == "transcript.partial":
                             sanitized = sanitize_urdu_to_hindi(message.text)
@@ -303,7 +374,9 @@ class SarvamVoiceProvider:
                 finally:
                     if not sender.done():
                         sender.cancel()
-                    await asyncio.gather(sender, return_exceptions=True)
+                    if not reader.done():
+                        reader.cancel()
+                    await asyncio.gather(sender, reader, return_exceptions=True)
         except SarvamAuthenticationError:
             raise
         except ProviderError:
@@ -311,7 +384,11 @@ class SarvamVoiceProvider:
         except Exception as exc:
             if _is_authentication_error(exc):
                 raise SarvamAuthenticationError() from exc
-            logger.error("sarvam_stt_failed", error_type=type(exc).__name__)
+            logger.error(
+                "sarvam_stt_failed",
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+            )
             raise ProviderError("Voice transcription provider failed") from exc
         finally:
             await http_client.aclose()

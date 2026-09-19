@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vyapar/design_system/components/app_button.dart';
 import 'package:vyapar/design_system/components/app_header.dart';
 import 'package:vyapar/design_system/components/app_text_field.dart';
 import 'package:vyapar/design_system/components/states.dart';
 import 'package:vyapar/design_system/icons/vyapar_icons.dart';
 import 'package:vyapar/design_system/layout/sliver_section.dart';
 import 'package:vyapar/design_system/tokens/colors.dart';
+import 'package:vyapar/design_system/tokens/radii.dart';
 import 'package:vyapar/design_system/tokens/spacing.dart';
 import 'package:vyapar/features/inventory/models/inventory_item.dart';
 import 'package:vyapar/features/inventory/providers/inventory_provider.dart';
@@ -43,6 +45,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             child: AppHeader(
               title: 'Inventory',
               subtitle: 'Live stock from your selected store',
+            ),
+          ),
+          const SliverSection(child: SizedBox(height: AppSpacing.lg)),
+          SliverSection(
+            child: ReceiptScanCard(
+              onScan: () => context.push('/inventory/scan-receipt'),
+              onManual: () => context.push('/inventory/add-product'),
             ),
           ),
           const SliverSection(child: SizedBox(height: AppSpacing.lg)),
@@ -91,6 +100,67 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       ),
     );
   }
+}
+
+class ReceiptScanCard extends StatelessWidget {
+  const ReceiptScanCard({
+    required this.onScan,
+    required this.onManual,
+    super.key,
+  });
+
+  final VoidCallback onScan;
+  final VoidCallback onManual;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: AppColors.paleCyan,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      border: Border.all(color: AppColors.cyan),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              VyaparIcon(VyaparIcons.scan, color: AppColors.navy),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Add stock from a receipt',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Scan or upload a bill, review every detected product, then confirm inventory.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          PrimaryButton(
+            key: const ValueKey('scan_receipt_action'),
+            label: 'Scan receipt',
+            onPressed: onScan,
+            leading: VyaparIcon(VyaparIcons.camera, color: Colors.white),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          SecondaryButton(
+            key: const ValueKey('add_inventory_manually'),
+            label: 'Add manually',
+            onPressed: onManual,
+            leading: VyaparIcon(VyaparIcons.add, color: AppColors.navy),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class InventoryRow extends StatelessWidget {

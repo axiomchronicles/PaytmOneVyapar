@@ -127,6 +127,17 @@ class InventoryItemResponse(APIModel):
     quantity_on_hand: Decimal
     reorder_point: Decimal
     is_low: bool
+    category: str | None = None
+    barcode: str | None = None
+    brand: str | None = None
+    description: str | None = None
+    unit_price: Decimal | None = None
+    purchase_price: Decimal | None = None
+    selling_price: Decimal | None = None
+    mrp: Decimal | None = None
+    gst_rate: Decimal | None = None
+    expiry_date: str | None = None
+    batch_number: str | None = None
 
 
 class InventoryEventRequest(APIModel):

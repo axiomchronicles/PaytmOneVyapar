@@ -19,6 +19,7 @@ class VoiceSession:
     started_at: datetime = field(default_factory=utc_now)
     interrupted: bool = False
     closed: bool = False
+    speaking: bool = False
     reconnect_count: int = 0
     history: list[dict[str, str]] = field(default_factory=list)
 
@@ -34,6 +35,7 @@ class VoiceSession:
 
     def interrupt(self) -> None:
         self.interrupted = True
+        self.speaking = False
 
     def close(self) -> None:
         self.closed = True
@@ -41,4 +43,5 @@ class VoiceSession:
     def reconnect(self) -> None:
         self.closed = False
         self.interrupted = False
+        self.speaking = False
         self.reconnect_count += 1

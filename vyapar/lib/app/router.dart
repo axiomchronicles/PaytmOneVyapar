@@ -20,6 +20,10 @@ import 'package:vyapar/features/auth/providers/auth_provider.dart';
 import 'package:vyapar/features/home/presentation/home_screen.dart';
 import 'package:vyapar/features/inventory/presentation/inventory_detail_screen.dart';
 import 'package:vyapar/features/inventory/presentation/inventory_screen.dart';
+import 'package:vyapar/features/inventory/presentation/manual_inventory_screen.dart';
+import 'package:vyapar/features/inventory/presentation/receipt_review_screen.dart';
+import 'package:vyapar/features/inventory/presentation/receipt_scan_screen.dart';
+import 'package:vyapar/features/inventory/presentation/receipt_success_screen.dart';
 import 'package:vyapar/features/munim/presentation/munim_screen.dart';
 import 'package:vyapar/features/negotiations/presentation/negotiation_detail_screen.dart';
 import 'package:vyapar/features/negotiations/presentation/negotiations_screen.dart';
@@ -159,6 +163,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/inventory/add-product',
+        builder: (context, state) => const ManualInventoryScreen(),
+      ),
+      GoRoute(
+        path: '/inventory/scan-receipt',
+        builder: (context, state) => const ReceiptScanScreen(),
+      ),
+      GoRoute(
+        path: '/inventory/scan-receipt/review',
+        builder: (context, state) => const ReceiptReviewScreen(),
+      ),
+      GoRoute(
+        path: '/inventory/scan-receipt/success',
+        builder: (context, state) => const ReceiptSuccessScreen(),
       ),
       GoRoute(
         path: '/inventory/:inventoryId',

@@ -15,7 +15,7 @@ from app.domain.entities import (
 
 class LLMProvider(Protocol):
     async def structured(
-        self, messages: Sequence[dict[str, str]], schema: type[BaseModel]
+        self, messages: Sequence[dict[str, Any]], schema: type[BaseModel]
     ) -> BaseModel: ...
 
 

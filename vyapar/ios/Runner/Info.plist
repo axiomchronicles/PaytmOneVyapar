@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Vyapar uses your microphone only during an active Munim voice session.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Vyapar uses your camera only when you choose to scan a receipt.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vyapar accesses your photos only when you choose a receipt to upload.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

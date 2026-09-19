@@ -1,9 +1,11 @@
 import asyncio
+import contextlib
 import json
 from collections.abc import AsyncIterator
 from uuid import UUID
 
 import jwt
+import structlog
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +20,7 @@ from app.infrastructure.db.models import RefreshSession, User
 from app.infrastructure.db.models import VoiceSession as VoiceSessionRow
 from app.infrastructure.db.session import get_session, get_session_factory
 
+logger = structlog.get_logger()
 router = APIRouter(prefix="/voice", tags=["voice"])
 
 
@@ -181,19 +184,39 @@ async def stream_voice(
                         "code": code,
                     }
                 )
-            except Exception:
+                await websocket.close(code=1011)
+            except (WebSocketDisconnect, RuntimeError):
                 pass
+            except Exception as close_exc:
+                logger.debug("voice_error_close_failed", error=str(close_exc))
 
     producer = asyncio.create_task(produce())
     try:
         while True:
+            if producer.done():
+                break
             message = await websocket.receive()
             msg_type = message.get("type")
             if msg_type == "websocket.disconnect":
                 await queue.put(None)
                 break
             if message.get("bytes") is not None:
-                await queue.put(message["bytes"])
+                if session.speaking:
+                    # Assistant is speaking or generating response; drop mic audio to prevent
+                    # acoustic echo feedback and queue congestion.
+                    continue
+                try:
+                    queue.put_nowait(message["bytes"])
+                except asyncio.QueueFull:
+                    # Drop oldest chunk so receive loop never blocks and latency stays minimal
+                    try:
+                        queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        pass
+                    try:
+                        queue.put_nowait(message["bytes"])
+                    except asyncio.QueueFull:
+                        pass
                 continue
             if message.get("text"):
                 control = json.loads(message["text"])
@@ -207,6 +230,8 @@ async def stream_voice(
     except (WebSocketDisconnect, RuntimeError):
         await queue.put(None)
     finally:
+        with contextlib.suppress(asyncio.QueueFull, RuntimeError):
+            queue.put_nowait(None)
         try:
             await asyncio.wait_for(producer, timeout=5)
         except Exception:

@@ -117,6 +117,40 @@ class _InventoryDetailBody extends ConsumerWidget {
                 label: 'Stock health',
                 value: item.isLow ? 'Needs attention' : 'Healthy',
               ),
+              if (item.category case final value?)
+                _DetailLine(label: 'Category', value: value),
+              if (item.brand case final value?)
+                _DetailLine(label: 'Brand', value: value),
+              if (item.barcode case final value?)
+                _DetailLine(label: 'Barcode', value: value),
+              if (item.description case final value?)
+                _DetailLine(label: 'Description', value: value),
+              if (item.unitPrice case final value?)
+                _DetailLine(
+                  label: 'Last printed rate',
+                  value: formatInr(value, decimals: true),
+                ),
+              if (item.purchasePrice case final value?)
+                _DetailLine(
+                  label: 'Purchase price',
+                  value: formatInr(value, decimals: true),
+                ),
+              if (item.sellingPrice case final value?)
+                _DetailLine(
+                  label: 'Selling price',
+                  value: formatInr(value, decimals: true),
+                ),
+              if (item.mrp case final value?)
+                _DetailLine(
+                  label: 'MRP',
+                  value: formatInr(value, decimals: true),
+                ),
+              if (item.gstRate case final value?)
+                _DetailLine(label: 'GST', value: '$value%'),
+              if (item.expiryDate case final value?)
+                _DetailLine(label: 'Expiry date', value: value),
+              if (item.batchNumber case final value?)
+                _DetailLine(label: 'Batch number', value: value),
               _DetailLine(label: 'Store ID', value: item.storeId),
               const SizedBox(height: AppSpacing.xl),
               PrimaryButton(
