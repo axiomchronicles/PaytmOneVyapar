@@ -21,19 +21,181 @@ def _is_authentication_error(error: object) -> bool:
     )
 
 
+URDU_TO_HINDI_WORDS: dict[str, str] = {
+    "اچھا": "अच्छा", "تو": "तो", "مجھے": "मुझे", "بتا": "बता", "سکتے": "सकते",
+    "ہیں": "हैं", "آج": "आज", "کوئی": "कोई", "وغیرہ": "वगैरह", "ہے": "है",
+    "جس": "जिस", "کے": "के", "ساتھ": "साथ", "میں": "में", "لین": "लेन",
+    "دین": "देन", "کر": "कर", "سکتا": "सकता", "ہوں": "हूँ", "جی": "जी",
+    "ابھی": "अभी", "آپ": "आप", "اسٹور": "स्टोर", "کسی": "किसी", "وینڈر": "वेंडर",
+    "کی": "की", "نہیں": "नहीं", "اگر": "अगर", "خاص": "खास", "نام": "नाम",
+    "بتائیں": "बताएं", "اس": "उस", "تفصیل": "तफसील", "چیک": "चेक", "کرنے": "करने",
+    "مدد": "मदद", "دوں": "दूँ", "گی": "गी", "کا": "का", "کو": "को", "سے": "से",
+    "پر": "पर", "تک": "तक", "یہ": "यह", "وہ": "वह", "کیا": "क्या", "کیوں": "क्यों",
+    "کب": "कब", "کہاں": "कहाँ", "کیسے": "कैसे", "کتنا": "कितना", "مال": "माल",
+    "اسٹاک": "स्टॉक", "خرید": "खरीद", "فروخت": "बिक्री", "آرڈر": "ऑर्डर",
+    "دکان": "दुकान", "منظوری": "मंजूरी", "پینڈنگ": "पेंडिंग", "زیر التوا": "पेंडिंग",
+    "موجود": "मौजूद", "شکریہ": "शुक्रिया", "سلام": "नमस्ते", "نمستے": "नमस्ते",
+    "یا": "या", "زیر": "पेंडिंग", "التوا": "",
+}
+
+URDU_TO_HINDI_CHARS: dict[str, str] = {
+    "ا": "अ", "آ": "आ", "ب": "ब", "پ": "प", "ت": "त", "ٹ": "ट", "ث": "स",
+    "ج": "ज", "چ": "च", "ح": "ह", "خ": "ख", "د": "द", "ڈ": "ड", "ذ": "ज़",
+    "ر": "र", "ڑ": "ड़", "ز": "ज़", "ژ": "ज़", "س": "स", "ش": "श", "ص": "स",
+    "ض": "ज़", "ط": "त", "ظ": "ज़", "ع": "अ", "غ": "ग़", "ف": "फ", "ق": "क",
+    "ک": "क", "گ": "ग", "ل": "ल", "م": "म", "ن": "न", "ں": "ं", "و": "ो",
+    "ہ": "ह", "ھ": "ह", "ء": "", "ی": "ी", "ے": "े", "؟": "?", "،": ",",
+    "۔": ".", "ئ": "ई", "ۂ": "ह", "ۃ": "त", "ۆ": "ओ",
+}
+
+
+def sanitize_urdu_to_hindi(text: str) -> str:
+    """Converts Perso-Arabic / Urdu script into Devanagari Hindi.
+
+    Sarvam saaras:v4 in auto mode or Hinglish occasionally detects Urdu and emits
+    Nastaliq script. This converts it back to readable Devanagari Hindi so Sarvam
+    bulbul:v3 TTS does not fail with 400 Bad Request.
+    """
+    if not text or not re.search(r"[\u0600-\u06FF]", text):
+        return text
+
+    words = text.split()
+    converted_words: list[str] = []
+    for w in words:
+        suffix = ""
+        clean_w = w
+        if clean_w and clean_w[-1] in "؟،.!,?":
+            suffix = clean_w[-1]
+            if suffix == "؟":
+                suffix = "?"
+            elif suffix == "،":
+                suffix = ","
+            elif suffix == "۔":
+                suffix = "."
+            clean_w = clean_w[:-1]
+
+        if clean_w in URDU_TO_HINDI_WORDS:
+            val = URDU_TO_HINDI_WORDS[clean_w]
+            if val:
+                converted_words.append(val + suffix)
+        else:
+            char_res = "".join(URDU_TO_HINDI_CHARS.get(c, c) for c in clean_w)
+            converted_words.append(char_res + suffix)
+
+    res = " ".join(converted_words)
+    return re.sub(r"\s+", " ", res).strip()
+
+
+def normalize_stt_language(lang: str | None) -> str:
+    """Normalizes STT language code for Sarvam saaras:v4.
+
+    Ensures 'auto' and unspecified languages map to 'hi-IN' so the model does not
+    accidentally classify Hindustani speech as 'ur-IN' and output Nastaliq script.
+    """
+    code = (lang or "").strip().lower()
+    if not code or code in ("auto", "und", "hi", "hi-in", "bho", "bho-in", "hi-bho"):
+        return "hi-IN"
+    if code.startswith("gu"):
+        return "gu-IN"
+    if code.startswith("bn"):
+        return "bn-IN"
+    if code.startswith("ta"):
+        return "ta-IN"
+    if code.startswith("te"):
+        return "te-IN"
+    if code.startswith("mr"):
+        return "mr-IN"
+    if code.startswith("en"):
+        return "en-IN"
+    if code.startswith("kn"):
+        return "kn-IN"
+    if code.startswith("ml"):
+        return "ml-IN"
+    if code.startswith("pa"):
+        return "pa-IN"
+    if code.startswith("or") or code.startswith("od"):
+        return "or-IN"
+    return "hi-IN"
+
+
 def clean_text_for_natural_voice(text: str) -> str:
     """Prepares text for natural, smooth neural speech with human-like breathing pauses.
 
     Sarvam bulbul:v3 relies on punctuation for prosody and tone:
+    - Transliterates any stray Urdu characters to Devanagari Hindi.
+    - Strips markdown symbols (*, #, _, ~, `).
     - Multiple dots/dashes cause unnatural hesitation.
     - Semicolons and colons are softened to natural clause commas.
     - Whitespace is normalized.
     """
-    cleaned = re.sub(r"\.{2,}", ".", text)
+    cleaned = sanitize_urdu_to_hindi(text)
+    # Strip any remaining Perso-Arabic/Urdu script characters to guarantee TTS compatibility
+    cleaned = re.sub(r"[\u0600-\u06FF]", "", cleaned)
+    cleaned = re.sub(r"[\*#_`~]", "", cleaned)
+    cleaned = re.sub(r"^\s*[-•]\s*", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"\.{2,}", ".", cleaned)
     cleaned = re.sub(r"-{2,}", " ", cleaned)
     cleaned = cleaned.replace(";", ",").replace(":", ",")
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned.strip()
+
+
+def resolve_target_language(text: str, language_code: str | None = None) -> str:
+    """Resolves concrete BCP-47 language code for Sarvam TTS.
+
+    bulbul:v3 requires a valid language code (cannot accept 'auto', 'und', or empty).
+    If auto/unspecified, script detection inspects text to select the proper Indian language.
+    """
+    # If text contains Urdu/Arabic characters, target language MUST be Hindi
+    if re.search(r"[\u0600-\u06FF]", text):
+        return "hi-IN"
+
+    lang = (language_code or "").strip().lower()
+    if lang in ("bho-in", "bho", "hi-bho"):
+        return "hi-IN"
+    if lang.startswith("hi"):
+        return "hi-IN"
+    if lang.startswith("en"):
+        return "en-IN"
+    if lang.startswith("gu"):
+        return "gu-IN"
+    if lang.startswith("bn"):
+        return "bn-IN"
+    if lang.startswith("ta"):
+        return "ta-IN"
+    if lang.startswith("te"):
+        return "te-IN"
+    if lang.startswith("mr"):
+        return "mr-IN"
+    if lang.startswith("kn"):
+        return "kn-IN"
+    if lang.startswith("ml"):
+        return "ml-IN"
+    if lang.startswith("pa"):
+        return "pa-IN"
+    if lang.startswith("od"):
+        return "od-IN"
+
+    if re.search(r"[\u0A80-\u0AFF]", text):
+        return "gu-IN"
+    if re.search(r"[\u0980-\u09FF]", text):
+        return "bn-IN"
+    if re.search(r"[\u0B80-\u0BFF]", text):
+        return "ta-IN"
+    if re.search(r"[\u0C00-\u0C7F]", text):
+        return "te-IN"
+    if re.search(r"[\u0C80-\u0CFF]", text):
+        return "kn-IN"
+    if re.search(r"[\u0D00-\u0D7F]", text):
+        return "ml-IN"
+    if re.search(r"[\u0A00-\u0A7F]", text):
+        return "pa-IN"
+    if re.search(r"[\u0B00-\u0B7F]", text):
+        return "od-IN"
+    if re.search(r"[\u0900-\u097F]", text):
+        return "hi-IN"
+
+    return "en-IN"
 
 
 class SarvamVoiceProvider:
@@ -47,7 +209,7 @@ class SarvamVoiceProvider:
         tts_pace: float = 1.0,
         tts_temperature: float = 0.6,
         tts_sample_rate: int = 24000,
-        tts_codec: str = "mp3",
+        tts_codec: str = "linear16",
         tts_bitrate: str = "192k",
         enable_preprocessing: bool = True,
         min_buffer_size: int = 60,
@@ -79,9 +241,10 @@ class SarvamVoiceProvider:
 
         http_client = httpx.AsyncClient(timeout=60)
         client = AsyncSarvamAI(api_subscription_key=self.api_key, httpx_client=http_client)
+        stt_lang = normalize_stt_language(language_code)
         try:
             async with client.speech_to_text_realtime_streaming.connect(
-                language_code=language_code,
+                language_code=stt_lang,
                 model=self.stt_model,
                 stream_type="fast",
                 mode="codemix",
@@ -89,6 +252,10 @@ class SarvamVoiceProvider:
                 encoding=encoding,
                 sample_rate=str(sample_rate),
                 return_timestamps="true",
+                threshold="0.35",
+                prefix_padding_ms="300",
+                silence_duration_ms="800",
+                prompt="दुकानदार और ग्राहक की बातचीत, Paytm ONE Vyapar inventory billing",
             ) as socket:
 
                 async def send_audio() -> None:
@@ -103,16 +270,18 @@ class SarvamVoiceProvider:
                     async for message in socket:
                         event = getattr(message, "event", None)
                         if event == "transcript.partial":
+                            sanitized = sanitize_urdu_to_hindi(message.text)
                             yield VoiceEvent(
                                 type=VoiceEventType.TRANSCRIPT_PARTIAL,
-                                text=message.text,
-                                language_code=message.language or language_code,
+                                text=sanitized,
+                                language_code=message.language or stt_lang,
                             )
                         elif event == "transcript.final":
+                            sanitized = sanitize_urdu_to_hindi(message.text)
                             yield VoiceEvent(
                                 type=VoiceEventType.TRANSCRIPT_FINAL,
-                                text=message.text,
-                                language_code=message.language or language_code,
+                                text=sanitized,
+                                language_code=message.language or stt_lang,
                                 metadata={
                                     "utterance_index": message.utterance_idx,
                                     "start_s": message.start_s,
@@ -154,12 +323,13 @@ class SarvamVoiceProvider:
             ConfigureConnectionData,
         )
 
+        speech_text = clean_text_for_natural_voice(text)
+        if not speech_text:
+            return
+
         http_client = httpx.AsyncClient(timeout=60)
         client = AsyncSarvamAI(api_subscription_key=self.api_key, httpx_client=http_client)
-        # Normalize Bhojpuri or regional codes to Sarvam-supported TTS code:
-        # Bhojpuri uses Devanagari text synthesized via hi-IN speaker
-        target_lang = "hi-IN" if language_code in ("bho-IN", "bho", "hi-BHO") else language_code
-        speech_text = clean_text_for_natural_voice(text)
+        target_lang = resolve_target_language(speech_text, language_code)
 
         try:
             # Primary path: Low-latency WebSocket streaming with bulbul:v3 neural parameters
@@ -196,11 +366,12 @@ class SarvamVoiceProvider:
                                 audio_content_type=getattr(
                                     audio_data, "content_type", f"audio/{self.tts_codec}"
                                 ),
-                                language_code=language_code,
+                                language_code=target_lang,
                                 metadata={
                                     "speaker": self.tts_speaker,
                                     "sample_rate": self.tts_sample_rate,
                                     "bitrate": self.tts_bitrate,
+                                    "codec": self.tts_codec,
                                 },
                             )
                     elif msg_type == "event":
@@ -217,10 +388,10 @@ class SarvamVoiceProvider:
             if _is_authentication_error(exc):
                 logger.error("sarvam_authentication_failed", provider="sarvam")
                 raise SarvamAuthenticationError() from exc
-            logger.warning("sarvam_streaming_tts_fallback", error_type=type(exc).__name__)
+            logger.warning("sarvam_streaming_tts_fallback", error=str(exc), error_type=type(exc).__name__)
             # Resilient fallback: Stream via HTTP convert_stream for uninterrupted delivery
             try:
-                stream = await client.text_to_speech.convert_stream(
+                stream = client.text_to_speech.convert_stream(
                     text=speech_text,
                     language_code=target_lang,
                     speaker=self.tts_speaker,
@@ -238,13 +409,14 @@ class SarvamVoiceProvider:
                             type=VoiceEventType.AUDIO,
                             audio=chunk,
                             audio_content_type=f"audio/{self.tts_codec}",
-                            language_code=language_code,
-                            metadata={"fallback": True, "speaker": self.tts_speaker},
+                            language_code=target_lang,
+                            metadata={"fallback": True, "speaker": self.tts_speaker, "codec": self.tts_codec},
                         )
             except Exception as fallback_exc:
                 if _is_authentication_error(fallback_exc):
                     logger.error("sarvam_authentication_failed", provider="sarvam")
                     raise SarvamAuthenticationError() from fallback_exc
+                logger.error("sarvam_tts_fallback_failed", error=str(fallback_exc))
                 raise ProviderError("Sarvam TTS synthesis failed") from fallback_exc
         finally:
             await http_client.aclose()
