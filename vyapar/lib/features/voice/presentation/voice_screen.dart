@@ -45,7 +45,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
   }
 
   Future<void> _start() async {
-    final language = ref.read(languagePreferenceProvider).value ?? 'auto';
+    final language = ref.read(languagePreferenceProvider).value ?? 'hi-IN';
     await ref
         .read(voiceControllerProvider.notifier)
         .start(
@@ -156,8 +156,13 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
                               onPressed: _start,
                             )
                           else if (voice.phase == VoicePhase.speaking)
-                            SecondaryButton(
-                              label: 'Interrupt',
+                            DangerButton(
+                              key: const ValueKey('voice_interrupt_button'),
+                              label: 'Interrupt Munim',
+                              leading: const VyaparIcon(
+                                VyaparIcons.reject,
+                                color: Colors.white,
+                              ),
                               onPressed: ref
                                   .read(voiceControllerProvider.notifier)
                                   .interrupt,

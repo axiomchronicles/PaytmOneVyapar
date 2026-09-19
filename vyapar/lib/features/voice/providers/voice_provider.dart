@@ -103,9 +103,10 @@ class VoiceController extends Notifier<VoiceState> {
           encoder: AudioEncoder.pcm16bits,
           sampleRate: 16000,
           numChannels: 1,
-          echoCancel: true,
-          noiseSuppress: true,
-          streamBufferSize: 3200,
+          echoCancel: false,
+          noiseSuppress: false,
+          autoGain: true,
+          streamBufferSize: 1600,
         ),
       );
       _microphoneSubscription = microphone.listen(channel.sink.add);

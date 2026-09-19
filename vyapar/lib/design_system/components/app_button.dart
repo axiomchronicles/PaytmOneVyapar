@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vyapar/design_system/tokens/colors.dart';
 import 'package:vyapar/design_system/tokens/radii.dart';
 
-enum AppButtonStyle { primary, secondary, text }
+enum AppButtonStyle { primary, secondary, text, danger }
 
 class AppButton extends StatelessWidget {
   const AppButton({
@@ -79,6 +79,19 @@ class AppButton extends StatelessWidget {
         style: TextButton.styleFrom(foregroundColor: AppColors.navy),
         child: content,
       ),
+      AppButtonStyle.danger => SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: FilledButton(
+          onPressed: callback,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.danger,
+            foregroundColor: Colors.white,
+            shape: shape,
+          ),
+          child: content,
+        ),
+      ),
     };
   }
 }
@@ -102,3 +115,14 @@ class SecondaryButton extends AppButton {
     super.leading,
   }) : super(style: AppButtonStyle.secondary);
 }
+
+class DangerButton extends AppButton {
+  const DangerButton({
+    required super.label,
+    required super.onPressed,
+    super.key,
+    super.loading,
+    super.leading,
+  }) : super(style: AppButtonStyle.danger);
+}
+

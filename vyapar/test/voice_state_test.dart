@@ -1,5 +1,10 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vyapar/design_system/components/app_button.dart';
 import 'package:vyapar/features/voice/models/voice_models.dart';
+import 'package:vyapar/features/voice/presentation/voice_screen.dart';
+import 'package:vyapar/features/voice/providers/voice_provider.dart';
 
 void main() {
   test(
@@ -32,4 +37,39 @@ void main() {
     expect(speaking.transcript, 'stock kitna hai');
     expect(speaking.response, 'Checking your inventory.');
   });
+
+  testWidgets('voice screen renders red DangerButton when Munim is speaking', (tester) async {
+    final speakingState = const VoiceState(
+      phase: VoicePhase.speaking,
+      response: 'Haan ji, main check kar rahi hoon.',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          voiceControllerProvider.overrideWith(() => _SpeakingVoiceController(speakingState)),
+        ],
+        child: const MaterialApp(
+          home: VoiceScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final interruptFinder = find.byKey(const ValueKey('voice_interrupt_button'));
+    expect(interruptFinder, findsOneWidget);
+    expect(find.text('Interrupt Munim'), findsOneWidget);
+
+    final button = tester.widget<DangerButton>(interruptFinder);
+    expect(button.style, AppButtonStyle.danger);
+  });
 }
+
+class _SpeakingVoiceController extends VoiceController {
+  _SpeakingVoiceController(this._state);
+  final VoiceState _state;
+
+  @override
+  VoiceState build() => _state;
+}
+

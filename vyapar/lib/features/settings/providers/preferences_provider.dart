@@ -7,11 +7,11 @@ class LanguagePreference extends AsyncNotifier<String> {
   @override
   Future<String> build() async {
     final preferences = await SharedPreferences.getInstance();
-    return preferences.getString(_key) ?? 'auto';
+    return preferences.getString(_key) ?? 'hi-IN';
   }
 
   Future<void> select(String languageCode) async {
-    final previous = state.value ?? 'auto';
+    final previous = state.value ?? 'hi-IN';
     state = AsyncData(languageCode);
     try {
       final preferences = await SharedPreferences.getInstance();
