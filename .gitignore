@@ -17,4 +17,4 @@ Thumbs.db
 .agents/
 .claude/
 
-design_reference/
+design_reference/*.zip

@@ -1,0 +1,129 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vyapaar_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vyapaar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-vyapaar}
+    volumes:
+      - vyapaar_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vyapaar} -d ${POSTGRES_DB:-vyapaar}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8.2.1-alpine
+    container_name: vyapaar_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - vyapaar_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    container_name: vyapaar_backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: "false"
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-*}
+      APP_CHECKPOINTER: ${APP_CHECKPOINTER:-redis}
+
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_POOL_SIZE: "10"
+
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_REQUIRED: "true"
+
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      AUTH_APPROVAL_SECRET: ${AUTH_APPROVAL_SECRET}
+      AUTH_JWT_ALGORITHM: HS256
+      AUTH_ACCESS_TOKEN_MINUTES: "30"
+      AUTH_REFRESH_TOKEN_DAYS: "30"
+      AUTH_APPROVAL_TOKEN_MINUTES: "10"
+      AUTH_OTP_SECRET: ${AUTH_OTP_SECRET}
+      AUTH_OTP_EXPIRY_MINUTES: "5"
+      AUTH_OTP_RESEND_SECONDS: "45"
+      AUTH_OTP_MAX_ATTEMPTS: "5"
+      AUTH_OTP_MAX_RESENDS: "3"
+
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
+
+      LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
+      LLM_MODEL: ${LLM_MODEL:-}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-}
+
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      SARVAM_STT_MODEL: saaras:v4
+      SARVAM_TTS_MODEL: bulbul:v3
+      SARVAM_TTS_SPEAKER: ${SARVAM_TTS_SPEAKER:-ritu}
+      SARVAM_TTS_CODEC: ${SARVAM_TTS_CODEC:-mp3}
+
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_GRAPH_API_VERSION: ${WHATSAPP_GRAPH_API_VERSION:-v21.0}
+
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-PaytmOneVyapar_bot}
+
+      A2A_AGENT_ID: ${A2A_AGENT_ID:-11111111-1111-4111-8111-111111111111}
+      A2A_SIGNING_SECRET: ${A2A_SIGNING_SECRET}
+      A2A_MAX_CLOCK_SKEW_SECONDS: "300"
+
+      FORECAST_MODEL: baseline
+      FORECAST_MODEL_PATH: models/demand.txt
+      FORECAST_MIN_TRAINING_ROWS: "60"
+
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Paytm ONE Vyapar <auth@tuboxlabs.com>}
+
+      TELEMETRY_ENABLED: "false"
+      SENTRY_DSN: ""
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    container_name: vyapaar_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+
+volumes:
+  vyapaar_postgres_data:
+  vyapaar_redis_data:
