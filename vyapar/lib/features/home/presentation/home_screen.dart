@@ -37,7 +37,12 @@ class HomeScreen extends ConsumerWidget {
         key: const PageStorageKey('home_scroll'),
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: const [
-          SliverSection(child: _MerchantTopBar()),
+          SliverSection(
+            child: Padding(
+              padding: EdgeInsets.only(top: 14, bottom: 2),
+              child: _MerchantTopBar(),
+            ),
+          ),
           SliverSection(child: SizedBox(height: 14)),
           SliverSection(child: _MerchantHeroBanner()),
           SliverSection(child: SizedBox(height: 18)),
@@ -56,7 +61,7 @@ class HomeScreen extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Merchant Top Bar (Brand + Tagline + Notification + Avatar + Store Selector)
+// 1. Merchant Top Bar (Store Selector + Notifications + Profile Avatar)
 // ---------------------------------------------------------------------------
 class _MerchantTopBar extends ConsumerWidget {
   const _MerchantTopBar();
@@ -66,13 +71,13 @@ class _MerchantTopBar extends ConsumerWidget {
     final profile = ref.watch(merchantControllerProvider);
     final initials = profile.when(
       data: (p) => p.initials,
-      loading: () => 'RS',
-      error: (_, _) => 'RS',
+      loading: () => 'MK',
+      error: (_, _) => 'MK',
     );
     final storeName = profile.when(
       data: (p) => p.name,
-      loading: () => 'Ramesh General Store',
-      error: (_, _) => 'Ramesh General Store',
+      loading: () => 'My Kirana',
+      error: (_, _) => 'My Kirana',
     );
     final locality = profile.when(
       data: (p) => p.stores.firstOrNull?.locality ?? 'Karol Bagh, New Delhi',
@@ -80,159 +85,161 @@ class _MerchantTopBar extends ConsumerWidget {
       error: (_, _) => 'Karol Bagh, New Delhi',
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Top row: Logo + Tagline | Bell + Avatar
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const VyaparLogo(height: 32),
-            const SizedBox(width: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: 'Notifications',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  onPressed: () => context.push('/notifications'),
-                  icon: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Icon(
-                        Icons.notifications_none_rounded,
-                        size: 26,
-                        color: Color(0xFF1D232C),
-                      ),
-                      Positioned(
-                        top: 2,
-                        right: 2,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE51A4C),
-                            shape: BoxShape.circle,
-                          ),
+        // Store Selector on left (in place of logo)
+        Expanded(
+          child: InkWell(
+            onTap: () => _showStoreBottomSheet(context, storeName, locality),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/store_thumb.png',
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEBF5FE),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () => context.push('/more/profile'),
-                  borderRadius: BorderRadius.circular(19),
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFDDEEFE),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        initials,
-                        style: const TextStyle(
-                          color: Color(0xFF002E6E),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                        child: const Icon(
+                          Icons.storefront_rounded,
+                          color: Color(0xFF007AEB),
+                          size: 22,
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        // Store Selector row
-        InkWell(
-          onTap: () => _showStoreBottomSheet(context, storeName, locality),
-          borderRadius: BorderRadius.circular(10),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  'assets/store_thumb.png',
-                  width: 38,
-                  height: 38,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEBF5FE),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.storefront_rounded,
-                      color: Color(0xFF007AEB),
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(
-                          child: Text(
-                            storeName,
-                            style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                storeName,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1D232C),
+                                  letterSpacing: -0.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 19,
                               color: Color(0xFF1D232C),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 3),
-                        const Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: 18,
-                          color: Color(0xFF1D232C),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on_rounded,
-                          size: 13,
-                          color: Color(0xFF007AEB),
-                        ),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: Text(
-                            locality,
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF64748B),
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.location_on_rounded,
+                              size: 13,
+                              color: Color(0xFF007AEB),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                locality,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Right side: Bell + Avatar
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Notifications',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              onPressed: () => context.push('/notifications'),
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(
+                    Icons.notifications_none_rounded,
+                    size: 26,
+                    color: Color(0xFF1D232C),
+                  ),
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE51A4C),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () => context.push('/more/profile'),
+              borderRadius: BorderRadius.circular(19),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDDEEFE),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      color: Color(0xFF002E6E),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
@@ -1144,9 +1151,9 @@ class _MunimVoiceBanner extends StatelessWidget {
           onPressed: () => context.push('/voice'),
           icon: const Icon(Icons.mic_none_rounded, size: 14, color: Color(0xFF007AEB)),
           label: const Text(
-            'Voice Par Baat Karein',
+            'Baat Karein',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color: Color(0xFF007AEB),
             ),
@@ -1157,7 +1164,7 @@ class _MunimVoiceBanner extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             visualDensity: VisualDensity.compact,
           ),
         ),
