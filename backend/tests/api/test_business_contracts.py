@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from conftest import MERCHANT_ID, PRODUCT_ID, STORE_ID
 
+from app.agents.munim_context import MunimContextService
 from app.application.services.approval_service import ApprovalService
 from app.domain.entities import PurchaseProposal
 from app.infrastructure.db.models import (
@@ -19,6 +20,7 @@ from app.infrastructure.db.models import (
     OrderItem,
     Supplier,
     SupplierProduct,
+    User,
 )
 from app.infrastructure.db.repositories.approvals import ApprovalRepository
 
@@ -305,3 +307,99 @@ def test_home_dashboard_and_merchant_action_contracts(client, auth_headers) -> N
     )
     assert campaign_resp.status_code == 200
     assert campaign_resp.json()["status"] == "ACTIVE"
+
+
+def test_nearby_merchants_uses_merchant_contact_and_supports_legacy_path(
+    client, auth_headers, db_factory
+) -> None:
+    merchant_id = uuid4()
+
+    async def prepare() -> None:
+        async with db_factory() as session, session.begin():
+            session.add(
+                Merchant(
+                    id=merchant_id,
+                    name="Nearby Kirana",
+                    phone_number="919876543210",
+                )
+            )
+            # A login user deliberately has no phone_number attribute. The
+            # public contact must be read from its Merchant record.
+            session.add(
+                User(
+                    merchant_id=merchant_id,
+                    email="nearby-kirana@example.com",
+                    password_hash=None,
+                    role="merchant",
+                )
+            )
+
+    asyncio.run(prepare())
+
+    for path in ("/api/v1/suppliers/discovery/merchants", "/api/v1/suppliers/merchants"):
+        response = client.get(path, headers=auth_headers)
+        assert response.status_code == 200
+        items = response.json()["items"]
+        nearby = next(item for item in items if item["id"] == str(merchant_id))
+        assert nearby["phone_number"] == "919876543210"
+
+
+def test_discovered_supplier_detail_exposes_its_catalog(client, auth_headers, db_factory) -> None:
+    supplier_id = uuid4()
+    supplier_merchant_id = uuid4()
+
+    async def prepare() -> None:
+        async with db_factory() as session, session.begin():
+            session.add(Merchant(id=supplier_merchant_id, name="External Supplier Owner"))
+            session.add(
+                Supplier(
+                    id=supplier_id,
+                    merchant_id=supplier_merchant_id,
+                    name="External Wholesale Hub",
+                    is_active=True,
+                )
+            )
+            session.add(
+                SupplierProduct(
+                    supplier_id=supplier_id,
+                    product_id=PRODUCT_ID,
+                    supplier_sku="EXTERNAL-COLA",
+                    available_quantity=Decimal("25"),
+                    unit_price=Decimal("425"),
+                    lead_time_days=2,
+                )
+            )
+
+    asyncio.run(prepare())
+
+    discovered = client.get("/api/v1/suppliers/discovery/nearby", headers=auth_headers)
+    assert discovered.status_code == 200
+    assert any(item["id"] == str(supplier_id) for item in discovered.json()["items"])
+
+    detail = client.get(f"/api/v1/suppliers/{supplier_id}", headers=auth_headers)
+    assert detail.status_code == 200
+    assert detail.json()["product_count"] == 1
+    assert detail.json()["products"][0]["supplier_sku"] == "EXTERNAL-COLA"
+
+
+def test_munim_context_values_stock_from_supplier_catalog(db_factory) -> None:
+    supplier_id = uuid4()
+
+    async def fetch_context() -> dict:
+        async with db_factory() as session, session.begin():
+            session.add(Supplier(id=supplier_id, name="Pricing Supplier", is_active=True))
+            session.add(
+                SupplierProduct(
+                    supplier_id=supplier_id,
+                    product_id=PRODUCT_ID,
+                    supplier_sku="PRICE-COLA",
+                    available_quantity=Decimal("100"),
+                    unit_price=Decimal("450"),
+                    lead_time_days=1,
+                )
+            )
+        async with db_factory() as session:
+            return await MunimContextService(session).get_business_context(MERCHANT_ID)
+
+    context = asyncio.run(fetch_context())
+    assert context["total_inventory_value"] == 1350.0

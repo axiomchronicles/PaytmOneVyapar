@@ -108,5 +108,6 @@ def test_authenticated_shortage_to_order_history_flow(client, db_factory, settin
     assert approved.status_code == 200, approved.text
     order_id = approved.json()["workflow"]["execution_result"]["order_id"]
     assert client.get(f"/api/v1/orders/{order_id}", headers=headers).json()["status"] == "CONFIRMED"
+    assert order_id in {row["id"] for row in client.get("/api/v1/orders", headers=headers).json()["items"]}
     assert client.get("/api/v1/notifications", headers=headers).json()["items"]
     assert client.get("/api/v1/history/activity", headers=headers).json()["items"]

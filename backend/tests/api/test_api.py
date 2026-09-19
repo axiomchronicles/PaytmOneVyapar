@@ -124,11 +124,15 @@ def test_approval_and_order_endpoints(client, auth_headers, db_factory, settings
             )
             await session.flush()
             approval_id = approval.id
-        return approval_id, token
+            proposal_id = approval.proposal_id
+        return approval_id, proposal_id, token
 
-    approval_id, token = asyncio.run(prepare())
+    approval_id, proposal_id, token = asyncio.run(prepare())
     fetched = client.get(f"/api/v1/approvals/{approval_id}", headers=auth_headers)
     assert fetched.status_code == 200
+    legacy_deep_link = client.get(f"/api/v1/approvals/{proposal_id}", headers=auth_headers)
+    assert legacy_deep_link.status_code == 200
+    assert legacy_deep_link.json()["id"] == str(approval_id)
     approved = client.post(
         f"/api/v1/approvals/{approval_id}/approve",
         headers=auth_headers,

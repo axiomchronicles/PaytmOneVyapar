@@ -390,3 +390,56 @@ def test_email_test_endpoint(client, settings) -> None:
     assert resp.status_code == 200
     assert resp.json()["status"] == "sent"
     assert resp.json()["email_id"] == "mock-email-id-999"
+
+
+def test_supplier_otp_registration_flow(client) -> None:
+    delivery = CaptureOtpDelivery()
+    client.app.state.otp_delivery = delivery
+    requested = client.post(
+        "/api/v1/auth/otp/request",
+        json={"identifier": "915566998796", "purpose": "REGISTRATION"},
+    )
+    assert requested.status_code == 201
+    challenge_id = requested.json()["challenge_id"]
+
+    verified = client.post(
+        "/api/v1/auth/otp/verify",
+        json={"challenge_id": challenge_id, "otp": delivery.codes[0]},
+    )
+    assert verified.status_code == 200
+    assert verified.json()["registration_required"] is True
+    reg_token = verified.json()["registration_token"]
+
+    registration = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "supplier-distributor@example.com",
+            "phone_number": "915566998796",
+            "password": "StrongPassword9",
+            "business_name": "Metro Wholesale Hub",
+            "store_name": "Bengaluru Central Warehouse",
+            "role": "supplier",
+            "category": "FMCG Distribution",
+            "registration_token": reg_token,
+            "address": {
+                "address_line1": "Plot 42, Industrial Wholesale Area",
+                "city": "Bengaluru",
+                "state": "Karnataka",
+                "pincode": "560058",
+                "country": "India",
+            },
+        },
+    )
+    assert registration.status_code == 201
+    reg_data = registration.json()
+    assert reg_data["role"] == "supplier"
+    assert reg_data["access_token"]
+
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {reg_data['access_token']}"},
+    )
+    assert me.status_code == 200
+    me_data = me.json()
+    assert me_data["role"] == "supplier"
+    assert me_data["business_name"] == "Metro Wholesale Hub"

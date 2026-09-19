@@ -295,3 +295,17 @@ def test_manual_inventory_add_uses_same_stock_event_path(client, auth_headers, d
     assert Decimal(manual["selling_price"]) == Decimal("50")
     assert Decimal(manual["mrp"]) == Decimal("55")
     assert Decimal(manual["gst_rate"]) == Decimal("5")
+
+    munim = client.post(
+        "/api/v1/agents/chat",
+        headers=auth_headers,
+        json={"message": "Maine Tea pack scan karke add kiya. Inventory aur transaction batao."},
+    )
+    assert munim.status_code == 200, munim.text
+    context = munim.json()["business_context"]
+    assert any(item["sku"] == "TEA-MANUAL-1" for item in context["available_items"])
+    assert context["recent_inventory_events"][0]["sku"] == "TEA-MANUAL-1"
+    assert {call["tool"] for call in munim.json()["tool_calls"]} >= {
+        "get_inventory_summary",
+        "get_transaction_summary",
+    }
