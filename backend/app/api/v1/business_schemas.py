@@ -81,6 +81,22 @@ class SupplierProductView(ContractModel):
     lead_time_days: int
 
 
+class SupplierCatalogUpsertRequest(ContractModel):
+    sku: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    unit: str = Field(min_length=1, max_length=30)
+    available_quantity: Decimal = Field(ge=0)
+    unit_price: Decimal = Field(gt=0)
+    lead_time_days: int = Field(default=1, ge=0, le=90)
+    category: str | None = Field(default=None, max_length=100)
+    supplier_sku: str | None = Field(default=None, max_length=100)
+
+
+class SupplierOrderDecisionRequest(ContractModel):
+    approved: bool
+    idempotency_key: str = Field(min_length=8, max_length=128)
+
+
 class SupplierView(ContractModel):
     id: UUID
     name: str
@@ -88,6 +104,12 @@ class SupplierView(ContractModel):
     is_active: bool
     trust_score: Decimal
     product_count: int = 0
+    phone_number: str | None = None
+    gstin: str | None = None
+    city: str | None = None
+    state: str | None = None
+    pincode: str | None = None
+    category: str | None = None
     products: list[SupplierProductView] = Field(default_factory=list)
 
 
@@ -99,6 +121,7 @@ class NegotiationView(ContractModel):
     correlation_id: UUID
     workflow_request_id: str | None
     proposal_id: UUID | None
+    approval_id: UUID | None = None
     sku: str
     status: str
     round_count: int
@@ -107,6 +130,15 @@ class NegotiationView(ContractModel):
     current_quote: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime
+
+
+class StartNegotiationRequest(ContractModel):
+    sku: str = Field(min_length=1, max_length=100)
+    supplier_id: UUID | None = None
+    store_id: UUID | None = None
+    quantity: Decimal | None = Field(default=None, gt=0)
+    target_price: Decimal | None = Field(default=None, gt=0)
+    max_price: Decimal | None = Field(default=None, gt=0)
 
 
 class A2AActivityView(ContractModel):
@@ -121,6 +153,7 @@ class A2AActivityView(ContractModel):
     status: str
     summary: str
     occurred_at: datetime
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class ActivityView(ContractModel):
@@ -238,11 +271,11 @@ class AnalyticsOverviewView(ContractModel):
     low_inventory_products: int
     orders_by_status: dict[str, int]
     range: DateRangeView
-    total_sales_amount: Decimal = Field(default=Decimal("18420.00"))
-    sales_growth_pct: Decimal = Field(default=Decimal("12.0"))
-    customer_count: int = Field(default=146)
-    customer_growth_pct: Decimal = Field(default=Decimal("8.0"))
-    expected_settlement: Decimal = Field(default=Decimal("17980.00"))
+    total_sales_amount: Decimal = Field(default=Decimal("0.00"))
+    sales_growth_pct: Decimal = Field(default=Decimal("0.0"))
+    customer_count: int = Field(default=0)
+    customer_growth_pct: Decimal = Field(default=Decimal("0.0"))
+    expected_settlement: Decimal = Field(default=Decimal("0.00"))
     critical_alert: CriticalAlertView | None = None
     opportunities: list[OpportunityView] = Field(default_factory=list)
     quick_actions: list[QuickActionView] = Field(default_factory=list)
@@ -275,3 +308,71 @@ class ProcurementSupplierView(ContractModel):
 class ProcurementAnalyticsView(ContractModel):
     currency: str
     suppliers: list[ProcurementSupplierView]
+
+
+class CustomerView(ContractModel):
+    id: UUID
+    merchant_id: UUID
+    name: str
+    phone_number: str
+    email: str | None = None
+    address: dict[str, Any] = Field(default_factory=dict)
+    total_orders: int = 0
+    total_spent: Decimal = Decimal("0.00")
+    last_visit: datetime | None = None
+    created_at: datetime
+
+
+class TransactionView(ContractModel):
+    id: UUID
+    merchant_id: UUID
+    order_id: UUID
+    approval_id: UUID
+    amount: Decimal
+    currency: str
+    status: str
+    idempotency_key: str
+    provider_reference: str | None = None
+    created_at: datetime
+
+
+class SettlementDetailView(ContractModel):
+    id: UUID
+    merchant_id: UUID
+    store_id: UUID | None = None
+    amount: Decimal
+    currency: str
+    status: str
+    utr: str | None = None
+    bank_name: str
+    account_ending: str
+    settlement_time: str
+    settled_at: datetime | None = None
+    created_at: datetime
+
+
+class NearbySupplierView(ContractModel):
+    id: UUID
+    name: str
+    city: str | None = None
+    state: str | None = None
+    pincode: str | None = None
+    locality: str | None = None
+    distance_km: float | None = None
+    trust_score: Decimal = Decimal("0.95")
+    product_count: int = 0
+    phone_number: str | None = None
+    category: str | None = None
+
+
+class NearbyMerchantView(ContractModel):
+    id: UUID
+    name: str
+    city: str | None = None
+    state: str | None = None
+    pincode: str | None = None
+    locality: str | None = None
+    distance_km: float | None = None
+    product_count: int = 0
+    phone_number: str | None = None
+    business_type: str = "retail"

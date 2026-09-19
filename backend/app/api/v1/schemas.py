@@ -1,9 +1,10 @@
+import re
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.domain.enums import OAuthProvider, OtpPurpose
 
@@ -28,6 +29,11 @@ class TokenResponse(APIModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
+    role: str = "merchant"
+    account_type: str = "merchant"
+    user_id: str | None = None
+    merchant_id: str | None = None
+    business_name: str | None = None
 
 
 class RefreshRequest(APIModel):
@@ -69,17 +75,69 @@ class AuthResult(APIModel):
     expires_in: int | None = None
     registration_token: str | None = None
     email: EmailStr | None = None
+    role: str = "merchant"
+    account_type: str = "merchant"
+    user_id: str | None = None
+    merchant_id: str | None = None
+    business_name: str | None = None
+
+
+class AddressInput(APIModel):
+    flat_shop: str = Field(default="", max_length=150)
+    address_line1: str = Field(default="", max_length=200)
+    address_line2: str | None = Field(default=None, max_length=200)
+    area_locality: str = Field(default="", max_length=150)
+    landmark: str | None = Field(default=None, max_length=150)
+    city: str = Field(default="", max_length=100)
+    district: str = Field(default="", max_length=100)
+    state: str = Field(default="", max_length=100)
+    pincode: str = Field(default="", max_length=20)
+    country: str = Field(default="India", max_length=60)
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class RegistrationRequest(APIModel):
     email: EmailStr
+    role: str = Field(default="merchant")
     business_name: str = Field(min_length=2, max_length=200)
     store_name: str = Field(min_length=2, max_length=200)
     registration_token: str = Field(min_length=20)
     password: str | None = Field(default=None, min_length=12, max_length=128)
     phone_number: str | None = Field(default=None, min_length=10, max_length=30)
+    gstin: str | None = Field(default=None)
+    pan: str | None = Field(default=None)
+    category: str | None = Field(default=None, max_length=100)
     address: dict[str, Any] = Field(default_factory=dict)
     device_name: str | None = Field(default=None, max_length=120)
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        norm = v.strip().lower()
+        if norm not in {"merchant", "supplier", "owner"}:
+            raise ValueError("Role must be 'merchant' or 'supplier'")
+        return "merchant" if norm == "owner" else norm
+
+    @field_validator("gstin")
+    @classmethod
+    def validate_gstin(cls, v: str | None) -> str | None:
+        if v is not None and v.strip():
+            v = v.strip().upper()
+            if not re.match(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$", v):
+                raise ValueError("Invalid GSTIN format. Example: 29AABCU9603R1ZM")
+            return v
+        return v
+
+    @field_validator("pan")
+    @classmethod
+    def validate_pan(cls, v: str | None) -> str | None:
+        if v is not None and v.strip():
+            v = v.strip().upper()
+            if not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", v):
+                raise ValueError("Invalid PAN format. Example: AABCU9603R")
+            return v
+        return v
 
     @model_validator(mode="after")
     def validate_password_strength(self) -> "RegistrationRequest":
@@ -90,6 +148,22 @@ class RegistrationRequest(APIModel):
         ):
             raise ValueError("Password must contain upper-case, lower-case, and numeric characters")
         return self
+
+
+class UserMeResponse(APIModel):
+    user_id: UUID
+    merchant_id: UUID
+    role: str
+    account_type: str
+    email: str
+    business_name: str
+    phone_number: str | None = None
+    gstin: str | None = None
+    pan: str | None = None
+    is_email_verified: bool = False
+    is_phone_verified: bool = False
+    stores: list[dict[str, Any]] = Field(default_factory=list)
+
 
 
 class OAuthExchangeRequest(APIModel):
@@ -192,3 +266,26 @@ class VoiceSessionRequest(APIModel):
     active_proposal_id: UUID | None = None
     active_request_id: str | None = None
     approval_token: str | None = None
+
+
+class AgentChatMessage(APIModel):
+    role: str = "user"
+    content: str
+
+
+class AgentChatRequest(APIModel):
+    message: str
+    conversation_history: list[AgentChatMessage] = Field(default_factory=list)
+
+
+class AgentChatResponse(APIModel):
+    reply: str
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    business_context: dict[str, Any] = Field(default_factory=dict)
+
+
+class LowStockReplenishmentResponse(APIModel):
+    detected_count: int
+    low_stock_items: list[dict[str, Any]]
+    triggered_workflows: list[dict[str, Any]]
+    notifications_sent: list[str]

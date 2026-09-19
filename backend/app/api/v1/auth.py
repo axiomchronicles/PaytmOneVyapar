@@ -6,6 +6,7 @@ import structlog
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,7 @@ from app.api.v1.schemas import (
     RefreshRequest,
     RegistrationRequest,
     TokenResponse,
+    UserMeResponse,
 )
 from app.application.services.auth_service import (
     OAuthService,
@@ -34,6 +36,7 @@ from app.core.dependencies import Principal, get_current_principal
 from app.core.errors import AuthenticationError, InvalidOtpError, InvalidRequestError, ProviderError
 from app.core.security import verify_password
 from app.domain.enums import OAuthProvider
+from app.infrastructure.db.models import Merchant, Store, User
 from app.infrastructure.db.repositories.merchants import MerchantRepository
 from app.infrastructure.db.session import get_session
 
@@ -385,3 +388,44 @@ async def test_email(
         )
     email_id = await provider.send_otp(to_email, otp="789012")
     return {"status": "sent", "provider": "resend", "email_id": email_id, "recipient": to_email}
+
+
+@router.get("/me", response_model=UserMeResponse)
+async def me(
+    principal: Principal = Depends(get_current_principal),
+    session: AsyncSession = Depends(get_session),
+) -> UserMeResponse:
+    user = await session.get(User, principal.user_id)
+    if user is None:
+        raise AuthenticationError("User not found")
+    merchant = await session.get(Merchant, principal.merchant_id)
+    business_name = merchant.name if merchant else "My Business"
+    stores = list(await session.scalars(select(Store).where(Store.merchant_id == principal.merchant_id)))
+    store_dicts = [
+        {
+            "id": str(s.id),
+            "name": s.name,
+            "address": s.address,
+            "locality": (s.address or {}).get(
+                "area_locality",
+                (s.address or {}).get("locality", (s.address or {}).get("city", "Karol Bagh, New Delhi")),
+            )
+            if isinstance(s.address, dict)
+            else "Karol Bagh, New Delhi",
+        }
+        for s in stores
+    ]
+    return UserMeResponse(
+        user_id=user.id,
+        merchant_id=user.merchant_id,
+        role=user.role,
+        account_type=user.role,
+        email=user.email,
+        business_name=business_name,
+        phone_number=merchant.phone_number if merchant else None,
+        gstin=merchant.gstin if merchant else None,
+        pan=merchant.pan if merchant else None,
+        is_email_verified=user.is_email_verified,
+        is_phone_verified=user.is_phone_verified,
+        stores=store_dicts,
+    )

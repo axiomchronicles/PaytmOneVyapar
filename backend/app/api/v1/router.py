@@ -7,6 +7,7 @@ from app.api.v1 import (
     approvals,
     auth,
     channels,
+    customers,
     health,
     history,
     inventory,
@@ -16,6 +17,7 @@ from app.api.v1 import (
     orders,
     recommendations,
     suppliers,
+    transactions,
     voice,
     websocket,
 )
@@ -25,6 +27,8 @@ api_router.include_router(health.router)
 api_router.include_router(channels.router)
 api_router.include_router(auth.router)
 api_router.include_router(merchants.router)
+api_router.include_router(customers.router)
+api_router.include_router(transactions.router)
 api_router.include_router(inventory.router)
 api_router.include_router(recommendations.router)
 api_router.include_router(agents.router)

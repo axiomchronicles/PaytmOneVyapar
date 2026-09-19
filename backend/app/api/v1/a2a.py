@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
@@ -35,6 +35,9 @@ _SUMMARIES = {
 
 
 def _activity(row: A2AMessage) -> A2AActivityView:
+    payload: dict[str, Any] = {}
+    if row.envelope and isinstance(row.envelope, dict):
+        payload = row.envelope.get("payload") or {}
     return A2AActivityView(
         id=row.id,
         message_id=row.message_id,
@@ -47,6 +50,7 @@ def _activity(row: A2AMessage) -> A2AActivityView:
         status=row.status,
         summary=_SUMMARIES.get(row.intent, row.intent.replace("_", " ").title()),
         occurred_at=row.processed_at or row.created_at,
+        payload=payload,
     )
 
 
@@ -125,6 +129,17 @@ async def conversation(
         )
     )
     if not rows:
+        # A catalog-backed supplier may complete a deterministic quote without
+        # generating a signed envelope.  Its negotiation is still real and
+        # authorized; return an empty trail rather than a misleading 404.
+        negotiation = await session.scalar(
+            select(Negotiation.id).where(
+                Negotiation.merchant_id == principal.merchant_id,
+                Negotiation.correlation_id == correlation_id,
+            )
+        )
+        if negotiation is not None:
+            return []
         raise NotFoundError("A2A conversation not found")
     return [_activity(row) for row in rows]
 
