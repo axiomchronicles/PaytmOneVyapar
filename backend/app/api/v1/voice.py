@@ -122,6 +122,8 @@ async def stream_voice(
         authorization = websocket.headers.get("authorization", "")
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not token:
+            token = websocket.query_params.get("token", "")
+        if not token:
             raise AuthenticationError("Missing WebSocket bearer token")
         principal = await _websocket_principal(websocket, token, settings)
         session = websocket.app.state.voice_sessions.get(session_id)
@@ -130,7 +132,8 @@ async def stream_voice(
         if session.closed:
             session.reconnect()
     except Exception:
-        await websocket.close(code=4401)
+        await websocket.accept()
+        await websocket.close(code=4401, reason="Unauthorized")
         return
     pipeline = websocket.app.state.voice_pipeline
     if pipeline is None:
@@ -162,24 +165,33 @@ async def stream_voice(
                     await websocket.send_bytes(event.audio)
                 else:
                     await websocket.send_json(event.model_dump(mode="json", exclude_none=True))
+        except (WebSocketDisconnect, RuntimeError):
+            return
         except Exception as exc:
-            code = exc.code if isinstance(exc, VyapaarError) else "VOICE_PROVIDER_FAILED"
-            await websocket.send_json(
-                {
-                    "type": VoiceEventType.ERROR,
-                    "text": (
-                        exc.message
-                        if isinstance(exc, VyapaarError)
-                        else "Voice service is temporarily unavailable."
-                    ),
-                    "code": code,
-                }
-            )
+            try:
+                code = exc.code if isinstance(exc, VyapaarError) else "VOICE_PROVIDER_FAILED"
+                await websocket.send_json(
+                    {
+                        "type": VoiceEventType.ERROR,
+                        "text": (
+                            exc.message
+                            if isinstance(exc, VyapaarError)
+                            else "Voice service is temporarily unavailable."
+                        ),
+                        "code": code,
+                    }
+                )
+            except Exception:
+                pass
 
     producer = asyncio.create_task(produce())
     try:
         while True:
             message = await websocket.receive()
+            msg_type = message.get("type")
+            if msg_type == "websocket.disconnect":
+                await queue.put(None)
+                break
             if message.get("bytes") is not None:
                 await queue.put(message["bytes"])
                 continue
@@ -192,7 +204,7 @@ async def stream_voice(
                     break
                 elif control.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         await queue.put(None)
     finally:
         try:

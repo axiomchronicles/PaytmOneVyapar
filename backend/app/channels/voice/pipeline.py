@@ -265,6 +265,93 @@ def extract_voice_intent(text: str) -> VoiceIntent:
     ):
         intent = VoiceIntentType.REPORT_LOW_STOCK
         explicit = False
+    elif any(
+        _match_word(word, normalized)
+        for word in (
+            "hi",
+            "hello",
+            "kaise ho",
+            "kaisa hai",
+            "kya haal",
+            "namaste",
+            "namaskar",
+            "pranam",
+            "kem cho",
+            "kemon acho",
+            "vanakkam",
+            "namaskaram",
+            "sat sri akal",
+            "good morning",
+            "good afternoon",
+            "good evening",
+            "नमस्ते",
+            "नमस्कार",
+            "प्रणाम",
+            "કેમ છો",
+            "নমস্কার",
+            "வணக்கம்",
+            "నమస్కారం",
+        )
+    ):
+        intent = VoiceIntentType.GREETING
+        explicit = False
+    elif any(
+        _match_word(word, normalized)
+        for word in (
+            "kya kar sakte ho",
+            "kya kar sakti ho",
+            "who are you",
+            "tum kaun ho",
+            "aap kaun hain",
+            "help",
+            "madad",
+            "તમે કોણ છો",
+            "তুমি কে",
+            "நீ யார்",
+            "నువ్వు ఎవరు",
+        )
+    ):
+        intent = VoiceIntentType.CAPABILITIES
+        explicit = False
+    elif any(
+        _match_word(word, normalized)
+        for word in (
+            "stock",
+            "inventory",
+            "maal",
+            "kitna bacha",
+            "kya bacha",
+            "kya kam hai",
+            "stock check",
+            "maal kitna",
+            "સ્ટોક",
+            "ઇન્વેન્ટરી",
+            "இருப்பு",
+            "స్టాక్",
+            "साठा",
+        )
+    ):
+        intent = VoiceIntentType.QUERY_INVENTORY
+        explicit = False
+    elif any(
+        _match_word(word, normalized)
+        for word in (
+            "proposal",
+            "proposals",
+            "approval",
+            "approvals",
+            "pending",
+            "pending order",
+            "orders",
+            "प्रस्ताव",
+            "ઓર્ડર",
+        )
+    ):
+        intent = VoiceIntentType.QUERY_PROPOSALS
+        explicit = False
+    elif normalized:
+        intent = VoiceIntentType.GENERAL_QUERY
+        explicit = False
     else:
         intent = VoiceIntentType.UNKNOWN
         explicit = False

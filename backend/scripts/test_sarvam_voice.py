@@ -41,6 +41,7 @@ from app.agents.services import (
     SecureMemoryTransactionExecutor,
     WorkflowServices,
 )
+from app.channels.voice.agent import VoiceMunimAgent
 from app.channels.voice.i18n import get_voice_message
 from app.channels.voice.pipeline import VoicePipeline
 from app.channels.voice.protocol import VoiceEvent, VoiceEventType, VoiceIntentType
@@ -49,6 +50,7 @@ from app.channels.voice.sarvam import SarvamVoiceProvider
 from app.channels.voice.session import VoiceSession
 from app.core.config import get_settings
 from app.domain.enums import ApprovalStatus
+from app.integrations.llm import build_llm_provider
 from app.integrations.suppliers.mock_supplier import MockSupplierAdapter
 from app.ml.demand.baseline import BaselineForecaster
 
@@ -301,45 +303,9 @@ async def run_scenario_for_language(
     merchant_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
     user_id = UUID("99999999-9999-4999-8999-999999999999")
 
-    async def handle_voice_action(session: VoiceSession, intent) -> str:
-        if intent.intent in {
-            VoiceIntentType.APPROVE_ACTIVE_PROPOSAL,
-            VoiceIntentType.MODIFY_ACTIVE_PROPOSAL,
-            VoiceIntentType.REJECT_ACTIVE_PROPOSAL,
-        }:
-            if (
-                not session.active_request_id
-                or not session.active_proposal_id
-                or not session.approval_token
-            ):
-                return get_voice_message("no_active_proposal", session.language_code)
-            action = {
-                VoiceIntentType.APPROVE_ACTIVE_PROPOSAL: ApprovalStatus.APPROVED,
-                VoiceIntentType.MODIFY_ACTIVE_PROPOSAL: ApprovalStatus.MODIFIED,
-                VoiceIntentType.REJECT_ACTIVE_PROPOSAL: ApprovalStatus.REJECTED,
-            }[intent.intent]
-            completed = await runtime.resume(
-                merchant_id=session.merchant_id,
-                request_id=session.active_request_id,
-                action=action,
-                approval_token=session.approval_token,
-                quantity=float(intent.quantity)
-                if (intent.quantity and action == ApprovalStatus.MODIFIED)
-                else None,
-                user_id=session.user_id,
-                expected_proposal_id=session.active_proposal_id,
-            )
-            print(f"   🔒 Workflow status: {completed.get('execution_status')}")
-            if action == ApprovalStatus.APPROVED:
-                return get_voice_message("proposal_approved", session.language_code)
-            elif action == ApprovalStatus.MODIFIED:
-                return get_voice_message("proposal_modified", session.language_code)
-            return get_voice_message("proposal_rejected", session.language_code)
-        if intent.intent == VoiceIntentType.REQUEST_PURCHASE:
-            return get_voice_message("purchase_request", session.language_code)
-        if intent.intent == VoiceIntentType.REPORT_LOW_STOCK:
-            return get_voice_message("low_stock", session.language_code)
-        return get_voice_message("unknown_action", session.language_code)
+    llm = build_llm_provider(settings)
+    munim_agent = VoiceMunimAgent(llm_provider=llm, workflow_runtime=runtime)
+    handle_voice_action = munim_agent.handle
 
     # -------------------------------------------------------------
     # Scenario 1: Report Low Stock in Native Language

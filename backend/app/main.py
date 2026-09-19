@@ -34,11 +34,13 @@ from app.application.services.auth_service import (
     TelegramOtpDelivery,
     WhatsAppOtpDelivery,
 )
+from app.channels.voice.agent import VoiceMunimAgent
 from app.channels.voice.i18n import get_voice_message
 from app.channels.voice.pipeline import VoicePipeline
 from app.channels.voice.protocol import VoiceIntentType
 from app.channels.voice.sarvam import SarvamVoiceProvider
 from app.core.config import Settings, get_settings
+from app.integrations.llm import build_llm_provider
 from app.core.errors import VyapaarError
 from app.core.logging import configure_logging
 from app.domain.enums import ApprovalStatus
@@ -116,6 +118,7 @@ async def lifespan(app: FastAPI):
     app.state.provider_http_client = httpx.AsyncClient(timeout=30)
     app.state.email_provider = None
     app.state.telegram_provider = None
+    app.state.llm_provider = build_llm_provider(settings)
 
     telegram_delivery = None
     if settings.telegram_bot_token:
@@ -212,44 +215,13 @@ async def lifespan(app: FastAPI):
             tts_bitrate=settings.sarvam_tts_bitrate,
         )
 
-        async def handle_voice(session, intent) -> str:
-            if intent.intent in {
-                VoiceIntentType.APPROVE_ACTIVE_PROPOSAL,
-                VoiceIntentType.MODIFY_ACTIVE_PROPOSAL,
-                VoiceIntentType.REJECT_ACTIVE_PROPOSAL,
-            }:
-                if (
-                    not session.active_request_id
-                    or not session.active_proposal_id
-                    or not session.approval_token
-                ):
-                    return get_voice_message("no_active_proposal", session.language_code)
-                action = {
-                    VoiceIntentType.APPROVE_ACTIVE_PROPOSAL: ApprovalStatus.APPROVED,
-                    VoiceIntentType.MODIFY_ACTIVE_PROPOSAL: ApprovalStatus.MODIFIED,
-                    VoiceIntentType.REJECT_ACTIVE_PROPOSAL: ApprovalStatus.REJECTED,
-                }[intent.intent]
-                await app.state.workflow_runtime.resume(
-                    merchant_id=session.merchant_id,
-                    request_id=session.active_request_id,
-                    action=action,
-                    approval_token=session.approval_token,
-                    quantity=float(intent.quantity) if intent.quantity else None,
-                    user_id=session.user_id,
-                    expected_proposal_id=session.active_proposal_id,
-                )
-                if action == ApprovalStatus.APPROVED:
-                    return get_voice_message("proposal_approved", session.language_code)
-                elif action == ApprovalStatus.MODIFIED:
-                    return get_voice_message("proposal_modified", session.language_code)
-                return get_voice_message("proposal_rejected", session.language_code)
-            if intent.intent == VoiceIntentType.REQUEST_PURCHASE:
-                return get_voice_message("purchase_request", session.language_code)
-            if intent.intent == VoiceIntentType.REPORT_LOW_STOCK:
-                return get_voice_message("low_stock", session.language_code)
-            return get_voice_message("unknown_action", session.language_code)
-
-        app.state.voice_pipeline = VoicePipeline(provider, handle_voice)
+        munim_agent = VoiceMunimAgent(
+            llm_provider=app.state.llm_provider,
+            session_factory=get_session_factory(),
+            workflow_runtime=lambda: getattr(app.state, "workflow_runtime", None),
+        )
+        app.state.voice_munim_agent = munim_agent
+        app.state.voice_pipeline = VoicePipeline(provider, munim_agent.handle)
     else:
         logger.warning(
             "sarvam_configuration",

@@ -37,10 +37,13 @@ async def events(websocket: WebSocket) -> None:
         authorization = websocket.headers.get("authorization", "")
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not token:
+            token = websocket.query_params.get("token", "")
+        if not token:
             raise ValueError("Missing bearer token")
         principal = await _websocket_principal(websocket, token, websocket.app.state.settings)
     except Exception:
-        await websocket.close(code=4401)
+        await websocket.accept()
+        await websocket.close(code=4401, reason="Unauthorized")
         return
     hub: RealtimeHub = websocket.app.state.realtime_hub
     await hub.connect(principal.merchant_id, websocket)
@@ -53,5 +56,8 @@ async def events(websocket: WebSocket) -> None:
                 continue
             if message == "ping":
                 await websocket.send_text("pong")
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
         hub.disconnect(principal.merchant_id, websocket)
+

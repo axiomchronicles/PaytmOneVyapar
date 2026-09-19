@@ -19,7 +19,7 @@ class AppConfig {
       apiBaseUrl: base.replaceFirst(RegExp(r'/+$'), ''),
       voiceOutputCodec: const String.fromEnvironment(
         'VOICE_OUTPUT_CODEC',
-        defaultValue: 'mp3',
+        defaultValue: 'linear16',
       ),
       voiceOutputSampleRate: const int.fromEnvironment(
         'VOICE_OUTPUT_SAMPLE_RATE',

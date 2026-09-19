@@ -10,3 +10,6 @@ class DisabledLLMProvider:
         self, messages: Sequence[dict[str, str]], schema: type[BaseModel]
     ) -> BaseModel:
         raise ProviderError("LLM integration is disabled; deterministic services remain available")
+
+    async def generate(self, messages: Sequence[dict[str, str]]) -> str:
+        raise ProviderError("LLM integration is disabled; deterministic services remain available")

@@ -20,6 +20,17 @@ class VoiceSession:
     interrupted: bool = False
     closed: bool = False
     reconnect_count: int = 0
+    history: list[dict[str, str]] = field(default_factory=list)
+
+    def add_user_message(self, text: str) -> None:
+        self.history.append({"role": "user", "content": text})
+        if len(self.history) > 20:
+            self.history = self.history[-20:]
+
+    def add_assistant_message(self, text: str) -> None:
+        self.history.append({"role": "assistant", "content": text})
+        if len(self.history) > 20:
+            self.history = self.history[-20:]
 
     def interrupt(self) -> None:
         self.interrupted = True

@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     sarvam_tts_pace: float = Field(default=1.0, ge=0.5, le=2.0)
     sarvam_tts_temperature: float = Field(default=0.6, ge=0.01, le=2.0)
     sarvam_tts_sample_rate: int = Field(default=24000)
-    sarvam_tts_codec: str = "mp3"
+    sarvam_tts_codec: str = "linear16"
     sarvam_tts_bitrate: str = "192k"
 
     # Meta WhatsApp Cloud API (Coming Soon)

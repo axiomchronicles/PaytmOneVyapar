@@ -51,3 +51,13 @@ class AzureFoundryLLMProvider:
             if usage.get(direction) is not None:
                 llm_tokens.add(usage[direction], {"direction": direction})
         return result["parsed"]
+
+    async def generate(self, messages: Sequence[dict[str, str]]) -> str:
+        started = time.perf_counter()
+        result = await self.client.ainvoke(list(messages))
+        llm_latency.record((time.perf_counter() - started) * 1000)
+        usage = getattr(result, "usage_metadata", None) or {}
+        for direction in ("input_tokens", "output_tokens"):
+            if usage.get(direction) is not None:
+                llm_tokens.add(usage[direction], {"direction": direction})
+        return str(result.content).strip()
