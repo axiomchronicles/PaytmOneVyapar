@@ -21,6 +21,12 @@ async def execute_order(state: PurchaseWorkflowState, services: WorkflowServices
             "failure_reason": f"execution_failed:{type(exc).__name__}",
             "attempted_supplier_ids": attempted,
         }
+    if result.status == "APPROVAL_PENDING":
+        return {
+            "execution_status": "WAITING_SUPPLIER_APPROVAL",
+            "execution_result": result.model_dump(mode="json"),
+            "failure_reason": "",
+        }
     if result.status != "CONFIRMED":
         attempted = [*state.get("attempted_supplier_ids", []), str(proposal.supplier_id)]
         return {

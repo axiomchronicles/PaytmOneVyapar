@@ -33,10 +33,34 @@ async def negotiate(state: PurchaseWorkflowState, services: WorkflowServices) ->
             quote, request, constraints, round_number=1
         )
         chosen = quote
+        # Round 1: Record initial quote from supplier
+        history.append(
+            {
+                "round": 1,
+                "supplier_id": str(quote.supplier_id),
+                "quote_id": quote.quote_id,
+                "action": "QUOTE_RECEIVED",
+                "status": "INITIAL_QUOTE",
+                "unit_price": str(quote.unit_price),
+                "available_quantity": str(quote.available_quantity),
+                "delivery_at": quote.delivery_at.isoformat(),
+            }
+        )
         needs_counter = quote.unit_price > request.target_price
         if (not valid and set(failures) <= {"price_limit"}) or (valid and needs_counter):
             adapter = services.supplier(quote.supplier_id)
             counter_price = services.negotiation.counter_price(quote, request)
+            # Round 2: Record counter-offer from buyer agent
+            history.append(
+                {
+                    "round": 2,
+                    "supplier_id": str(quote.supplier_id),
+                    "action": "COUNTER_OFFER_SENT",
+                    "status": "COUNTER_OFFER",
+                    "unit_price": str(counter_price),
+                    "quantity": str(request.quantity),
+                }
+            )
             chosen = await adapter.counter_offer(
                 quote,
                 unit_price=float(counter_price),
@@ -44,7 +68,14 @@ async def negotiate(state: PurchaseWorkflowState, services: WorkflowServices) ->
                 idempotency_key=f"{state['request_id']}:counter:{quote.supplier_id}",
             )
             if chosen is None:
-                history.append({"supplier_id": str(quote.supplier_id), "status": "REJECTED"})
+                history.append(
+                    {
+                        "round": 2,
+                        "supplier_id": str(quote.supplier_id),
+                        "action": "OFFER_REJECTED",
+                        "status": "REJECTED",
+                    }
+                )
                 continue
             valid, failures = services.negotiation.validate_offer(
                 chosen, request, constraints, round_number=2
@@ -52,8 +83,10 @@ async def negotiate(state: PurchaseWorkflowState, services: WorkflowServices) ->
         if valid:
             history.append(
                 {
+                    "round": 2 if needs_counter else 1,
                     "supplier_id": str(chosen.supplier_id),
                     "quote_id": chosen.quote_id,
+                    "action": "OFFER_ACCEPTED",
                     "unit_price": str(chosen.unit_price),
                     "status": "ACCEPTED",
                 }
@@ -73,7 +106,11 @@ async def negotiate(state: PurchaseWorkflowState, services: WorkflowServices) ->
             await services.activity_recorder.record_negotiation({**state, **result})
             return result
         history.append(
-            {"supplier_id": str(quote.supplier_id), "status": "INVALID", "reasons": failures}
+            {
+                "supplier_id": str(quote.supplier_id),
+                "status": "INVALID",
+                "reasons": list(failures),
+            }
         )
     result = {"negotiation_history": history, "failure_reason": "negotiation_failed"}
     await services.activity_recorder.record_negotiation({**state, **result})

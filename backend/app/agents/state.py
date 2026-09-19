@@ -32,4 +32,5 @@ class PurchaseWorkflowState(TypedDict, total=False):
     failure_reason: str
     trace_id: str
     attempted_supplier_ids: list[str]
+    preferred_supplier_id: str
     merchant_quantity_override: bool

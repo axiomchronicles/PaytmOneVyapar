@@ -21,10 +21,12 @@ async def find_supplier(state: PurchaseWorkflowState, services: WorkflowServices
         store_id=UUID(state["store_id"]),
     )
     attempted = set(state.get("attempted_supplier_ids", []))
+    preferred_supplier_id = state.get("preferred_supplier_id")
     quotes = [
         quote
         for quote in await collect_quotes(services.suppliers, request)
         if str(quote.supplier_id) not in attempted
+        and (preferred_supplier_id is None or str(quote.supplier_id) == preferred_supplier_id)
     ]
     if not quotes:
         return {"candidate_suppliers": [], "failure_reason": "supplier_unavailable"}

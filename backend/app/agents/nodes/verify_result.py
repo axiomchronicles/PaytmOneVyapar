@@ -3,6 +3,8 @@ from app.agents.state import PurchaseWorkflowState
 
 def verify_result(state: PurchaseWorkflowState) -> dict:
     result = state.get("execution_result")
+    if state.get("execution_status") == "WAITING_SUPPLIER_APPROVAL":
+        return {"failure_reason": ""}
     if state.get("execution_status") != "SUCCEEDED" or not result:
         return {"failure_reason": state.get("failure_reason", "order_not_confirmed")}
     if result.get("status") != "CONFIRMED" or not result.get("supplier_confirmation"):

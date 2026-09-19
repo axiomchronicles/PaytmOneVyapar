@@ -63,6 +63,9 @@ class WorkflowServices:
         for adapter in self.suppliers:
             if getattr(adapter, "supplier_id", None) == supplier_id:
                 return adapter
+        for adapter in self.suppliers:
+            if getattr(adapter, "handles_all_suppliers", False):
+                return adapter
         raise LookupError(f"No adapter registered for supplier {supplier_id}")
 
 
@@ -175,6 +178,11 @@ class SecureMemoryTransactionExecutor:
             ),
             None,
         )
+        if supplier is None:
+            supplier = next(
+                (item for item in self.suppliers if getattr(item, "handles_all_suppliers", False)),
+                None,
+            )
         if supplier is None:
             raise AuthorizationError("No supplier adapter is registered for the approved supplier")
         result = await supplier.place_order(proposal, idempotency_key=idempotency_key)
@@ -301,6 +309,11 @@ class DatabaseTransactionExecutor:
             ),
             None,
         )
+        if supplier is None:
+            supplier = next(
+                (item for item in self.suppliers if getattr(item, "handles_all_suppliers", False)),
+                None,
+            )
         if supplier is None:
             raise AuthorizationError("No supplier adapter is registered for the approved supplier")
         async with self.session_factory() as session, session.begin():
