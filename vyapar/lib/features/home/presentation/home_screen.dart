@@ -447,9 +447,6 @@ class _AajKaHaalSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = ref.watch(analyticsControllerProvider).value;
     final inventory = ref.watch(inventoryControllerProvider);
-    final totalSales = analytics?.totalSalesAmount ?? 18420.0;
-    final salesGrowth = analytics?.salesGrowthPct ?? 12.0;
-    final customerCount = analytics?.customerCount ?? 146;
     final expectedSettlement = analytics?.expectedSettlement ?? 17980.0;
     final lowCount = inventory.value?.where((item) => item.isLow).length;
     final firstLow = inventory.value?.where((item) => item.isLow).firstOrNull;
@@ -497,293 +494,34 @@ class _AajKaHaalSection extends ConsumerWidget {
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        // 4 Stat Columns in a single row
+        const SizedBox(height: 16),
+        // 4 UPI Money Transfer style circular buttons
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Col 1: Total Sales
-            Expanded(
-              child: InkWell(
-                onTap: () => context.push('/analytics'),
-                borderRadius: BorderRadius.circular(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F8F0),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: VyaparIcon(
-                          VyaparIcons.chartUp,
-                          size: 18,
-                          color: Color(0xFF00BA7A),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Total Sales',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      formatInr(totalSales),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1D232C),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.arrow_upward_rounded,
-                          size: 11,
-                          color: Color(0xFF00A66E),
-                        ),
-                        const SizedBox(width: 1),
-                        Text(
-                          '${salesGrowth.toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF00A66E),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Text(
-                      'Kal se zyada',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            _AajKaHaalButton(
+              icon: VyaparIcons.chartUp,
+              label: 'Total Sales',
+              onTap: () => context.push('/analytics'),
             ),
-            const SizedBox(width: 6),
-            // Col 2: Customers
-            Expanded(
-              child: InkWell(
-                onTap: () => context.push('/analytics'),
-                borderRadius: BorderRadius.circular(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0F2FE),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: VyaparIcon(
-                          VyaparIcons.userGroup,
-                          size: 18,
-                          color: Color(0xFF00BAF2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Customers',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$customerCount',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1D232C),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.arrow_upward_rounded,
-                          size: 11,
-                          color: Color(0xFF00A66E),
-                        ),
-                        SizedBox(width: 1),
-                        Text(
-                          '8%',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF00A66E),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Text(
-                      'Kal se zyada',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            _AajKaHaalButton(
+              icon: VyaparIcons.userGroup,
+              label: 'Customers',
+              onTap: () => context.push('/analytics'),
             ),
-            const SizedBox(width: 6),
-            // Col 3: Settlement (Expected)
-            Expanded(
-              child: InkWell(
-                onTap: () => _showSettlementsSheet(context, expectedSettlement),
-                borderRadius: BorderRadius.circular(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEBF5FE),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: VyaparIcon(
-                          VyaparIcons.wallet,
-                          size: 18,
-                          color: Color(0xFF007AEB),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Settlement\n(Expected)',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                        height: 1.15,
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      formatInr(expectedSettlement),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1D232C),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    const Text(
-                      'Aaj',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            _AajKaHaalButton(
+              icon: VyaparIcons.wallet,
+              label: 'Settlement',
+              onTap: () => _showSettlementsSheet(context, expectedSettlement),
             ),
-            const SizedBox(width: 6),
-            // Col 4: Low Stock Items
-            Expanded(
-              child: InkWell(
-                onTap: () => context.push('/inventory'),
-                borderRadius: BorderRadius.circular(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3E8FF),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.inventory_2_outlined,
-                          size: 18,
-                          color: Color(0xFF8B5CF6),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Low Stock Items',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                        height: 1.15,
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${lowCount ?? 3}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1D232C),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFECEB),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          'Action needed →',
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFE51A4C),
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            _AajKaHaalButton(
+              icon: VyaparIcons.inventory,
+              label: 'Low Stock',
+              onTap: () => context.push('/inventory'),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         // Critical Stock Alert Card
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -920,6 +658,64 @@ class _AajKaHaalSection extends ConsumerWidget {
     );
   }
 }
+
+class _AajKaHaalButton extends StatelessWidget {
+  const _AajKaHaalButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final List<List<dynamic>> icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFF004299),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: VyaparIcon(
+                  icon,
+                  size: 26,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1D232C),
+                height: 1.25,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 
 // ---------------------------------------------------------------------------
 // 4. "Aapke liye mauke" (Actionable AI Recommendations)

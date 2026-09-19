@@ -39,12 +39,15 @@ class MunimScreen extends ConsumerWidget {
         ),
         const SliverSection(child: SizedBox(height: AppSpacing.lg)),
         SliverSection(
-          child: _MunimMessage(
-            message: isLoading
-                ? 'I’m checking the latest inventory signals.'
-                : lowItems.isEmpty
-                ? 'There are no low-stock items in the current inventory response.'
-                : '${lowItems.length} ${lowItems.length == 1 ? 'item is' : 'items are'} at or below the reorder point.',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.lg),
+            child: AspectRatio(
+              aspectRatio: 1230 / 1278,
+              child: Image.asset(
+                'assets/munim_ai_bg.webp',
+                fit: BoxFit.contain,
+              ),
+            ),
           ),
         ),
         const SliverSection(child: SizedBox(height: AppSpacing.lg)),
@@ -106,33 +109,4 @@ class MunimScreen extends ConsumerWidget {
       ],
     );
   }
-}
-
-class _MunimMessage extends StatelessWidget {
-  const _MunimMessage({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadii.lg),
-      border: Border.all(color: AppColors.outline),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AgentStatusIndicator(
-            label: 'Live business context',
-            active: true,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(message, style: Theme.of(context).textTheme.titleLarge),
-        ],
-      ),
-    ),
-  );
 }
