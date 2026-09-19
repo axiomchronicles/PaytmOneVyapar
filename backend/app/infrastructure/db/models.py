@@ -40,6 +40,9 @@ class Merchant(UUIDPrimaryKey, Timestamped, Base):
     phone_number: Mapped[str | None] = mapped_column(String(30), unique=True)
     currency: Mapped[str] = mapped_column(String(3), default="INR")
     spending_limit: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    gstin: Mapped[str | None] = mapped_column(String(20), index=True)
+    pan: Mapped[str | None] = mapped_column(String(20))
+    business_type: Mapped[str] = mapped_column(String(50), default="retail")
     settings: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
@@ -51,6 +54,30 @@ class Store(UUIDPrimaryKey, Timestamped, Base):
     name: Mapped[str] = mapped_column(String(200))
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata")
     address: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+    @property
+    def city(self) -> str | None:
+        if isinstance(self.address, dict):
+            return self.address.get("city")
+        return None
+
+    @property
+    def state(self) -> str | None:
+        if isinstance(self.address, dict):
+            return self.address.get("state")
+        return None
+
+    @property
+    def pincode(self) -> str | None:
+        if isinstance(self.address, dict):
+            return self.address.get("pincode") or self.address.get("postal_code")
+        return None
+
+    @property
+    def address_line1(self) -> str | None:
+        if isinstance(self.address, dict):
+            return self.address.get("address_line1") or self.address.get("street") or self.address.get("flat")
+        return None
 
 
 class Product(UUIDPrimaryKey, Timestamped, Base):
@@ -75,6 +102,10 @@ class Inventory(UUIDPrimaryKey, Timestamped, Base):
     quantity_on_hand: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
     reserved_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
     reorder_point: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
+
+    @property
+    def safety_stock(self) -> Decimal:
+        return Decimal("0")
 
 
 class InventoryEvent(UUIDPrimaryKey, Timestamped, Base):
@@ -108,6 +139,20 @@ class Sale(UUIDPrimaryKey, Timestamped, Base):
     signals: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
+class Customer(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "customers"
+    __table_args__ = (UniqueConstraint("merchant_id", "phone_number"),)
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    phone_number: Mapped[str] = mapped_column(String(30), index=True)
+    email: Mapped[str | None] = mapped_column(String(320))
+    address: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    total_orders: Mapped[int] = mapped_column(Integer, default=0)
+    total_spent: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0.00"))
+    last_visit: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Supplier(UUIDPrimaryKey, Timestamped, Base):
     __tablename__ = "suppliers"
 
@@ -117,6 +162,14 @@ class Supplier(UUIDPrimaryKey, Timestamped, Base):
     endpoint: Mapped[str | None] = mapped_column(String(500))
     trust_score: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    phone_number: Mapped[str | None] = mapped_column(String(30))
+    gstin: Mapped[str | None] = mapped_column(String(20))
+    pan: Mapped[str | None] = mapped_column(String(20))
+    city: Mapped[str | None] = mapped_column(String(100), index=True)
+    state: Mapped[str | None] = mapped_column(String(100))
+    pincode: Mapped[str | None] = mapped_column(String(20), index=True)
+    address: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    category: Mapped[str | None] = mapped_column(String(100))
     configuration: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
@@ -258,6 +311,22 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
     idempotency_key: Mapped[str] = mapped_column(String(128), index=True)
     provider_reference: Mapped[str | None] = mapped_column(String(200))
     error: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+
+class Settlement(UUIDPrimaryKey, Timestamped, Base):
+    __tablename__ = "settlements"
+    __table_args__ = (Index("ix_settlements_merchant_created", "merchant_id", "created_at"),)
+
+    merchant_id: Mapped[UUID] = mapped_column(ForeignKey("merchants.id"), index=True)
+    store_id: Mapped[UUID | None] = mapped_column(ForeignKey("stores.id"), index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    currency: Mapped[str] = mapped_column(String(3), default="INR")
+    status: Mapped[str] = mapped_column(String(40), default="PROCESSING")
+    utr: Mapped[str | None] = mapped_column(String(100), index=True)
+    bank_name: Mapped[str] = mapped_column(String(100), default="HDFC Bank")
+    account_ending: Mapped[str] = mapped_column(String(10), default="4921")
+    settlement_time: Mapped[str] = mapped_column(String(50), default="by 4:00 PM")
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuditLog(UUIDPrimaryKey, Timestamped, Base):

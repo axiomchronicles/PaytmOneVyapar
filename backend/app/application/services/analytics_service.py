@@ -6,7 +6,16 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import InvalidRequestError
-from app.infrastructure.db.models import Inventory, Merchant, Order, Product, Sale, Supplier
+from app.infrastructure.db.models import (
+    Customer,
+    Inventory,
+    Merchant,
+    Order,
+    Product,
+    Sale,
+    Settlement,
+    Supplier,
+)
 
 
 class AnalyticsService:
@@ -70,16 +79,36 @@ class AnalyticsService:
         low_inventory = await self.session.scalar(inventory_query)
         orders = await self.session.execute(orders_query.group_by(Order.status))
 
-        total_sales = sales_amount if sales_amount and sales_amount > 0 else Decimal("18420.00")
-        total_customers = customer_count if customer_count and customer_count > 0 else 146
-        low_stock_count = low_inventory if low_inventory and low_inventory > 0 else 3
-        expected_settlement = Decimal("17980.00")
+        real_customer_count = await self.session.scalar(
+            select(func.count(Customer.id)).where(Customer.merchant_id == merchant_id)
+        )
+        total_customers = (
+            real_customer_count
+            if real_customer_count and real_customer_count > 0
+            else (customer_count or 0)
+        )
+
+        pending_settlement = await self.session.scalar(
+            select(func.coalesce(func.sum(Settlement.amount), 0)).where(
+                Settlement.merchant_id == merchant_id,
+                Settlement.status == "PROCESSING",
+            )
+        )
+        expected_settlement = (
+            pending_settlement if pending_settlement and pending_settlement > 0 else Decimal("0.00")
+        )
+
+        total_sales = sales_amount if sales_amount is not None else Decimal("0.00")
+        low_stock_count = low_inventory or 0
 
         # Check for lowest inventory item to personalize alert
         low_item_query = (
             select(Product.name, Product.sku, Product.unit, Inventory.quantity_on_hand)
             .join(Product, Product.id == Inventory.product_id)
-            .where(Inventory.merchant_id == merchant_id)
+            .where(
+                Inventory.merchant_id == merchant_id,
+                Inventory.quantity_on_hand <= Inventory.reorder_point,
+            )
             .order_by(Inventory.quantity_on_hand.asc())
             .limit(1)
         )
@@ -90,52 +119,56 @@ class AnalyticsService:
         if low_item:
             item_name, item_sku, item_unit, qty = low_item
             alert_title = f"{item_name} ka stock kal tak khatam ho sakta hai"
-            alert_desc = f"Sirf {qty} {item_unit} bache hain. Is weekend demand 28% zyada rehne ki sambhaavna hai (38°C)."
+            alert_desc = f"Sirf {qty} {item_unit} bache hain. Reorder point se kam hai."
             alert_sku = item_sku
+            action_url = f"/recommendations/{item_sku}"
         else:
-            alert_title = "Cold drinks ka stock kal tak khatam ho sakta hai"
-            alert_desc = "Sirf 12 units bache hain. Is weekend demand 28% zyada rehne ki sambhaavna hai (38°C)."
-            alert_sku = "COLD-COLA-300"
+            alert_title = "Sabhi stock theek hain"
+            alert_desc = "Koi bhi item abhi reorder point se neeche nahi hai."
+            alert_sku = "ALL-OK"
+            action_url = "/inventory"
+
+        critical_alert = {
+            "title": alert_title,
+            "description": alert_desc,
+            "tag": "Dhyaan dene layak",
+            "sku": alert_sku,
+            "action_label": "Review",
+            "action_url": action_url,
+        }
 
         return {
-            "sales_quantity": sales_quantity,
+            "sales_quantity": sales_quantity or Decimal("0"),
             "low_inventory_products": low_stock_count,
             "orders_by_status": {status: count for status, count in orders},
             "range": {"from": start, "to": end},
             "total_sales_amount": total_sales,
-            "sales_growth_pct": Decimal("12.0"),
+            "sales_growth_pct": Decimal("12.0") if total_sales > 0 else Decimal("0.0"),
             "customer_count": total_customers,
-            "customer_growth_pct": Decimal("8.0"),
+            "customer_growth_pct": Decimal("8.0") if total_customers > 0 else Decimal("0.0"),
             "expected_settlement": expected_settlement,
-            "critical_alert": {
-                "title": alert_title,
-                "description": alert_desc,
-                "tag": "Dhyaan dene layak",
-                "sku": alert_sku,
-                "action_label": "Review",
-                "action_url": f"/recommendations/{alert_sku}",
-            },
+            "critical_alert": critical_alert,
             "opportunities": [
                 {
                     "id": "opp-1",
-                    "title": "Weekend offer chalayein cold drinks par",
-                    "subtitle": "₹5,000+ tak extra revenue ki sambhaavna",
-                    "action_label": "Offer Banayein",
+                    "title": "Cold drinks ka stock badhayein",
+                    "subtitle": "₹4,500+ tak extra revenue ki sambhaavna (Garmi badhne par)",
+                    "action_label": "Stock Badhayein",
                     "action_type": "offer",
                     "icon": "chart",
                 },
                 {
                     "id": "opp-2",
-                    "title": "3 crates kharidein 5% kam daam par",
-                    "subtitle": "North Delhi Distributor Se ₹375 ki bachat",
+                    "title": "Supplier discount: Atta 50kg bag par 5% off",
+                    "subtitle": "Metro Cash & Carry se bulk offer par ₹1,200 ki bachat",
                     "action_label": "Deal Dekhein",
                     "action_type": "deal",
                     "icon": "truck",
                 },
                 {
                     "id": "opp-3",
-                    "title": "Cricket match ke chalte sales badh rahi hain",
-                    "subtitle": "Aaj hi local customers ko target karein",
+                    "title": "Weekend WhatsApp offer bhejein",
+                    "subtitle": "Top 50 regular customers ko festive offer bhejein",
                     "action_label": "Campaign Chalayein",
                     "action_type": "campaign",
                     "icon": "tag",
@@ -144,9 +177,9 @@ class AnalyticsService:
             "quick_actions": [
                 {"id": "qa-1", "label": "Payment Accept Karein", "icon": "qr", "target": "payment_qr"},
                 {"id": "qa-2", "label": "Settlements Dekhein", "icon": "invoice", "target": "settlements"},
-                {"id": "qa-3", "label": "Inventory Manage Karein", "icon": "inventory", "target": "/inventory"},
-                {"id": "qa-4", "label": "Suppliers Dhoondhein", "icon": "bank", "target": "/suppliers"},
-                {"id": "qa-5", "label": "Campaign Chalayein", "icon": "megaphone", "target": "campaign"},
+                {"id": "qa-3", "label": "Stock Reorder Karein", "icon": "truck", "target": "reorder"},
+                {"id": "qa-4", "label": "Naya Item Jodein", "icon": "plus", "target": "add_product"},
+                {"id": "qa-5", "label": "Bill Scan Karein", "icon": "camera", "target": "scan_bill"},
             ],
         }
 
@@ -156,15 +189,37 @@ class AnalyticsService:
         *,
         store_id: UUID | None = None,
     ) -> dict:
+        stmt = (
+            select(Settlement)
+            .where(Settlement.merchant_id == merchant_id)
+            .order_by(Settlement.created_at.desc())
+        )
+        if store_id:
+            stmt = stmt.where(Settlement.store_id == store_id)
+        rows = list(await self.session.scalars(stmt))
+        processing = next((r for r in rows if r.status == "PROCESSING"), None)
+        settled = next((r for r in rows if r.status == "SETTLED"), None)
+        if processing or settled:
+            ref_row = processing or settled
+            return {
+                "expected_today": processing.amount if processing else Decimal("0.00"),
+                "currency": ref_row.currency or "INR",
+                "status": processing.status if processing else "Settled",
+                "settlement_time": ref_row.settlement_time or "by 4:00 PM",
+                "bank_name": ref_row.bank_name or "HDFC Bank",
+                "account_ending": ref_row.account_ending or "4921",
+                "yesterday_settled": settled.amount if settled else Decimal("0.00"),
+                "utr": (settled.utr if settled else processing.utr) or "PAYTMUTR000000",
+            }
         return {
-            "expected_today": Decimal("17980.00"),
+            "expected_today": Decimal("0.00"),
             "currency": "INR",
-            "status": "Processing",
+            "status": "No settlements",
             "settlement_time": "by 4:00 PM",
             "bank_name": "HDFC Bank",
             "account_ending": "4921",
-            "yesterday_settled": Decimal("16450.00"),
-            "utr": "PAYTMUTR982341209",
+            "yesterday_settled": Decimal("0.00"),
+            "utr": "-",
         }
 
     async def sales(

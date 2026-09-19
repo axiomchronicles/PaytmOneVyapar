@@ -68,48 +68,34 @@ class VoiceMunimAgent:
             "low_stock_items": [],
             "total_products": 0,
             "pending_approvals": 0,
+            "today_sales_amount": 0.0,
+            "expected_settlement": 0.0,
+            "bank_name": "HDFC Bank",
+            "account_ending": "4921",
+            "gstin": None,
         }
         if not self.session_factory:
             return context
 
         try:
+            from app.agents.munim_context import MunimContextService
+
             async with self.session_factory() as db:
-                merchant = await db.get(Merchant, merchant_id)
-                if merchant:
-                    context["merchant_name"] = merchant.name
-                    context["currency"] = merchant.currency or "INR"
-
-                # Find low-stock inventory
-                low_stmt = (
-                    select(
-                        Product.name,
-                        Product.unit,
-                        Inventory.quantity_on_hand,
-                        Inventory.reorder_point,
-                    )
-                    .join(Product, Inventory.product_id == Product.id)
-                    .where(
-                        Inventory.merchant_id == merchant_id,
-                        Inventory.quantity_on_hand <= Inventory.reorder_point,
-                    )
-                    .limit(6)
-                )
-                low_rows = (await db.execute(low_stmt)).all()
+                service = MunimContextService(db)
+                data = await service.get_business_context(merchant_id)
+                context["merchant_name"] = data.get("business_name", "Merchant")
+                context["currency"] = data.get("currency", "INR")
+                context["total_products"] = data.get("total_products", 0)
+                context["pending_approvals"] = len(data.get("pending_approvals", []))
+                context["today_sales_amount"] = data.get("today_sales_amount", 0.0)
+                context["expected_settlement"] = data.get("expected_settlement", 0.0)
+                context["bank_name"] = data.get("bank_name", "HDFC Bank")
+                context["account_ending"] = data.get("account_ending", "4921")
+                context["gstin"] = data.get("gstin")
                 context["low_stock_items"] = [
-                    f"{name} ({qty} {unit} on hand, reorder at {rp} {unit})"
-                    for name, unit, qty, rp in low_rows
+                    f"{item['name']} ({item['quantity_on_hand']} {item['unit']} on hand, reorder at {item['reorder_point']} {item['unit']})"
+                    for item in data.get("low_stock_items", [])
                 ]
-
-                # Total products
-                prod_stmt = select(func.count(Product.id)).where(Product.merchant_id == merchant_id)
-                context["total_products"] = (await db.scalar(prod_stmt)) or 0
-
-                # Pending approvals
-                appr_stmt = select(func.count(Approval.id)).where(
-                    Approval.merchant_id == merchant_id,
-                    Approval.status == ApprovalStatus.PENDING,
-                )
-                context["pending_approvals"] = (await db.scalar(appr_stmt)) or 0
         except Exception as exc:
             logger.warning("voice_munim_context_fetch_failed", error=str(exc))
 
@@ -218,6 +204,9 @@ class VoiceMunimAgent:
             f"MERCHANT LIVE SHOP CONTEXT:\n"
             f"- Store Name: {context['merchant_name']}\n"
             f"- Currency: {context['currency']}\n"
+            f"- GSTIN: {context.get('gstin') or 'Not Registered'}\n"
+            f"- Today's Sales: ₹{context.get('today_sales_amount', 0.0):,.2f}\n"
+            f"- Expected Settlement: ₹{context.get('expected_settlement', 0.0):,.2f} into {context.get('bank_name', 'HDFC Bank')} (ending {context.get('account_ending', '4921')})\n"
             f"- Total Catalog Items: {context['total_products']}\n"
             f"- Low Stock Products: {low_items_str}\n"
             f"- Pending Purchase Approvals: {context['pending_approvals']}\n"

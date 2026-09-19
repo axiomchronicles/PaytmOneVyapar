@@ -19,7 +19,12 @@ class ApprovalRepository:
         merchant_id: UUID | None = None,
         for_update: bool = False,
     ) -> Approval:
-        query = select(Approval).where(Approval.id == approval_id)
+        # Older mobile builds used the proposal UUID in approval deep links.
+        # Both identifiers are tenant-scoped and indexed, so resolve either
+        # identifier while every approval action still verifies its signed token.
+        query = select(Approval).where(
+            or_(Approval.id == approval_id, Approval.proposal_id == approval_id)
+        )
         if merchant_id is not None:
             query = query.where(Approval.merchant_id == merchant_id)
         if for_update:

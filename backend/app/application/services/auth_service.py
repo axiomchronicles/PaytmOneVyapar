@@ -39,6 +39,7 @@ from app.infrastructure.db.models import (
     OtpChallenge,
     RefreshSession,
     Store,
+    Supplier,
     User,
 )
 
@@ -235,12 +236,20 @@ class SessionService:
             secret=self.settings.auth_jwt_secret.get_secret_value(),
             algorithm=self.settings.auth_jwt_algorithm,
             ttl_minutes=self.settings.auth_access_token_minutes,
+            role=user.role,
         )
+        merchant = await self.session.get(Merchant, user.merchant_id)
+        business_name = merchant.name if merchant else None
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": self.settings.auth_access_token_minutes * 60,
+            "role": user.role,
+            "account_type": user.role,
+            "user_id": str(user.id),
+            "merchant_id": str(user.merchant_id),
+            "business_name": business_name,
         }
 
     async def refresh(
@@ -801,6 +810,10 @@ class RegistrationService:
         phone_number: str | None,
         address: dict[str, Any],
         device_name: str | None,
+        role: str = "merchant",
+        gstin: str | None = None,
+        pan: str | None = None,
+        category: str | None = None,
     ) -> dict[str, Any]:
         try:
             claims = jwt.decode(
@@ -872,14 +885,32 @@ class RegistrationService:
             )
             if duplicate_phone is not None:
                 raise ConflictError("An account already exists for this phone number")
-        merchant = Merchant(name=business_name, phone_number=normalized_phone)
+
+        norm_gstin = gstin.strip().upper() if gstin and gstin.strip() else None
+        norm_pan = pan.strip().upper() if pan and pan.strip() else None
+        if norm_gstin:
+            duplicate_gstin = await self.session.scalar(
+                select(Merchant.id).where(func.upper(Merchant.gstin) == norm_gstin)
+            )
+            if duplicate_gstin is not None:
+                raise ConflictError("An account already exists for this GSTIN")
+
+        norm_role = "supplier" if role.strip().lower() == "supplier" else "merchant"
+
+        merchant = Merchant(
+            name=business_name,
+            phone_number=normalized_phone,
+            gstin=norm_gstin,
+            pan=norm_pan,
+            business_type="supplier" if norm_role == "supplier" else "retail",
+        )
         self.session.add(merchant)
         await self.session.flush()
         user = User(
             merchant_id=merchant.id,
             email=normalized_email,
             password_hash=hash_password(password) if password else None,
-            role="owner",
+            role=norm_role,
             is_email_verified=email_verified,
             is_phone_verified=phone_verified,
         )
@@ -891,6 +922,24 @@ class RegistrationService:
                 address=address,
             )
         )
+        if norm_role == "supplier":
+            addr_dict = address if isinstance(address, dict) else {}
+            supplier = Supplier(
+                merchant_id=merchant.id,
+                name=business_name,
+                adapter_type="rest",
+                phone_number=normalized_phone,
+                gstin=norm_gstin,
+                pan=norm_pan,
+                city=addr_dict.get("city"),
+                state=addr_dict.get("state"),
+                pincode=addr_dict.get("pincode"),
+                address=addr_dict,
+                category=category or addr_dict.get("category", "General Supplies"),
+                configuration={"role": "supplier", "user_id": str(user.id)},
+            )
+            self.session.add(supplier)
+
         await self.session.flush()
         if oauth_subject is not None:
             self.session.add(

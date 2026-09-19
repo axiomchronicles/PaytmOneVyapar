@@ -46,11 +46,14 @@ def create_access_token(
     algorithm: str,
     ttl_minutes: int,
     session_id: UUID | str | None = None,
+    role: str = "merchant",
 ) -> str:
     now = utc_now()
     claims = {
         "sub": str(subject),
         "merchant_id": str(merchant_id),
+        "role": role,
+        "account_type": role,
         "type": "access",
         "iat": now,
         "exp": now + timedelta(minutes=ttl_minutes),

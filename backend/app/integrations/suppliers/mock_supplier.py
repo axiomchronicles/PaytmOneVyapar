@@ -63,7 +63,14 @@ class MockSupplierAdapter:
         self.message_recorder = message_recorder
         self.signing_secret = signing_secret or "development-a2a-secret-change-me"  # noqa: S105
         self.catalog = catalog or {
-            "COLD-COLA-300": CatalogItem("COLD-COLA-300", Decimal("240"), Decimal("470"), 1)
+            "COLD-COLA-300": CatalogItem("COLD-COLA-300", Decimal("240"), Decimal("470.00"), 1),
+            "TATA-SALT-1KG": CatalogItem("TATA-SALT-1KG", Decimal("500"), Decimal("26.00"), 1),
+            "FORTUNE-OIL-1L": CatalogItem("FORTUNE-OIL-1L", Decimal("180"), Decimal("142.00"), 1),
+            "AASHIRVAAD-ATTA-5KG": CatalogItem("AASHIRVAAD-ATTA-5KG", Decimal("120"), Decimal("220.00"), 1),
+            "MAGGI-70G": CatalogItem("MAGGI-70G", Decimal("600"), Decimal("12.00"), 1),
+            "PARLE-G-100G": CatalogItem("PARLE-G-100G", Decimal("300"), Decimal("10.00"), 1),
+            "AMUL-BUTTER-100G": CatalogItem("AMUL-BUTTER-100G", Decimal("150"), Decimal("56.00"), 1),
+            "DETTOL-SOAP-75G": CatalogItem("DETTOL-SOAP-75G", Decimal("200"), Decimal("40.00"), 1),
         }
         self.latency_seconds = latency_seconds
         self.fail_every = fail_every

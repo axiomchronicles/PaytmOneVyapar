@@ -41,7 +41,6 @@ from app.channels.voice.pipeline import VoicePipeline
 from app.channels.voice.protocol import VoiceIntentType
 from app.channels.voice.sarvam import SarvamVoiceProvider
 from app.core.config import Settings, get_settings
-from app.integrations.llm import build_llm_provider
 from app.core.errors import VyapaarError
 from app.core.logging import configure_logging
 from app.domain.enums import ApprovalStatus
@@ -53,6 +52,8 @@ from app.infrastructure.observability.sentry import configure_sentry
 from app.infrastructure.observability.tracing import configure_tracing
 from app.infrastructure.redis.client import RedisManager
 from app.integrations.email.resend import ResendEmailProvider
+from app.integrations.llm import build_llm_provider
+from app.integrations.suppliers.catalog_supplier import CatalogSupplierAdapter
 from app.integrations.suppliers.mock_supplier import MockSupplierAdapter
 from app.integrations.telegram.client import TelegramBotProvider
 from app.integrations.whatsapp.meta import MetaWhatsAppProvider
@@ -95,10 +96,12 @@ def _wire_runtime(app: FastAPI, settings: Settings, checkpointer) -> None:
         algorithm=settings.auth_jwt_algorithm,
         ttl_minutes=settings.auth_approval_token_minutes,
     )
-    executor = DatabaseTransactionExecutor(get_session_factory(), authority, [supplier])
+    catalog_supplier = CatalogSupplierAdapter(get_session_factory())
+    adapters = [supplier, catalog_supplier]
+    executor = DatabaseTransactionExecutor(get_session_factory(), authority, adapters)
     services = WorkflowServices(
         forecast_model=BaselineForecaster(),
-        suppliers=[supplier],
+        suppliers=adapters,
         approval_authority=authority,
         transaction_executor=executor,
         activity_recorder=DatabaseWorkflowActivityRecorder(get_session_factory()),

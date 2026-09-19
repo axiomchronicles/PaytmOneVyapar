@@ -23,6 +23,7 @@ from app.infrastructure.db.models import (
     OrderEvent,
     OrderItem,
     OutboxEvent,
+    Supplier,
     Transaction,
 )
 from app.infrastructure.db.repositories.approvals import ApprovalRepository
@@ -137,9 +138,12 @@ class OrderService:
         else:
             order.status = result.status
             order.supplier_reference = result.supplier_confirmation
-            transaction.status = TransactionStatus.SUCCEEDED
-            transaction.provider_reference = result.supplier_confirmation
-            event_type = EventType.ORDER_EXECUTED
+            if result.status == OrderStatus.APPROVAL_PENDING:
+                event_type = EventType.APPROVAL_REQUIRED
+            else:
+                transaction.status = TransactionStatus.SUCCEEDED
+                transaction.provider_reference = result.supplier_confirmation
+                event_type = EventType.ORDER_EXECUTED
         for envelope, direction, message_merchant_id in getattr(
             self.supplier, "pop_pending_messages", lambda _: []
         )(idempotency_key):
@@ -210,12 +214,21 @@ class OrderService:
                 },
             )
         )
+        awaiting_supplier = order.status == OrderStatus.APPROVAL_PENDING
         notification = Notification(
             merchant_id=merchant_id,
             notification_type=NotificationType.ORDER_UPDATE,
-            title=("Order confirmed" if order.status == OrderStatus.CONFIRMED else "Order failed"),
+            title=(
+                "Order sent to supplier"
+                if awaiting_supplier
+                else "Order confirmed"
+                if order.status == OrderStatus.CONFIRMED
+                else "Order failed"
+            ),
             body=(
-                "Your supplier confirmed the purchase order."
+                "The supplier has been asked to approve the order."
+                if awaiting_supplier
+                else "Your supplier confirmed the purchase order."
                 if order.status == OrderStatus.CONFIRMED
                 else "The supplier could not complete the purchase order."
             ),
@@ -224,6 +237,39 @@ class OrderService:
             payload={"status": order.status},
         )
         self.session.add(notification)
+        if awaiting_supplier:
+            supplier_account_id = await self.session.scalar(
+                select(Supplier.merchant_id).where(Supplier.id == proposal.supplier_id)
+            )
+            if supplier_account_id is not None:
+                supplier_notification = Notification(
+                    merchant_id=supplier_account_id,
+                    notification_type=NotificationType.APPROVAL_REQUIRED,
+                    title="New purchase order needs approval",
+                    body=(
+                        f"{merchant.name} requested {proposal.quantity} {proposal.unit} of "
+                        f"{proposal.sku}. Review stock before settlement."
+                    ),
+                    entity_type="order",
+                    entity_id=order.id,
+                    payload={"status": order.status, "buyer_merchant_id": str(merchant_id)},
+                )
+                self.session.add(supplier_notification)
+                await self.session.flush()
+                self.session.add(
+                    OutboxEvent(
+                        merchant_id=supplier_account_id,
+                        aggregate_type="notification",
+                        aggregate_id=supplier_notification.id,
+                        event_type=EventType.NOTIFICATION_CREATED,
+                        correlation_id=request_correlation_id,
+                        payload={
+                            "notification_id": str(supplier_notification.id),
+                            "entity_type": "order",
+                            "entity_id": str(order.id),
+                        },
+                    )
+                )
         await self.session.flush()
         a2a_correlation_id = getattr(self.supplier, "correlation_id_for_quote", lambda _: None)(
             proposal.quote_id
@@ -257,9 +303,13 @@ class OrderService:
                 merchant_id=merchant_id,
                 actor_type="TRANSACTION_SERVICE",
                 actor_id="order-executor",
-                action="order.executed"
-                if order.status == OrderStatus.CONFIRMED
-                else "order.failed",
+                action=(
+                    "order.awaiting_supplier_approval"
+                    if awaiting_supplier
+                    else "order.executed"
+                    if order.status == OrderStatus.CONFIRMED
+                    else "order.failed"
+                ),
                 resource_type="order",
                 resource_id=str(order.id),
                 metadata_={
