@@ -69,11 +69,14 @@ class AppErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final message = error is AppFailure
-        ? (error as AppFailure).message
+    final failure = error is AppFailure ? error as AppFailure : null;
+    final message = failure != null
+        ? failure.message
         : 'The page could not be loaded.';
     return EmptyState(
-      title: 'Couldn’t load this',
+      title: failure?.kind == FailureKind.validation
+          ? 'Check the form'
+          : 'Couldn’t load this',
       message: message,
       actionLabel: onRetry == null ? null : 'Try again',
       onAction: onRetry,
@@ -89,10 +92,7 @@ class LoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => VyaparShimmer(
     child: Column(
-      children: List<Widget>.generate(
-        rows,
-        (index) => const SkeletonTile(),
-      ),
+      children: List<Widget>.generate(rows, (index) => const SkeletonTile()),
     ),
   );
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vyapar/app/providers.dart';
 import 'package:vyapar/core/networking/cursor_page.dart';
+import 'package:vyapar/features/orders/models/order_detail.dart';
 import 'package:vyapar/features/suppliers/data/supplier_repository.dart';
 import 'package:vyapar/features/suppliers/models/supplier.dart';
 
@@ -38,3 +39,23 @@ final supplierDetailProvider = FutureProvider.autoDispose
     .family<SupplierDetail, String>(
       (ref, id) => ref.watch(supplierRepositoryProvider).get(id),
     );
+
+final nearbySuppliersProvider =
+    FutureProvider.autoDispose<List<NearbySupplier>>((ref) async {
+  return ref.watch(supplierRepositoryProvider).discoverNearbySuppliers();
+});
+
+final nearbyMerchantsProvider =
+    FutureProvider.autoDispose<List<NearbyMerchant>>((ref) async {
+  return ref.watch(supplierRepositoryProvider).discoverNearbyMerchants();
+});
+
+final mySupplierProfileProvider =
+    FutureProvider.autoDispose<SupplierDetail>((ref) async {
+  return ref.watch(supplierRepositoryProvider).getMySupplierProfile();
+});
+
+final mySupplierOrdersProvider =
+    FutureProvider.autoDispose<List<OrderDetail>>((ref) async {
+  return ref.watch(supplierRepositoryProvider).getMySupplierOrders();
+});

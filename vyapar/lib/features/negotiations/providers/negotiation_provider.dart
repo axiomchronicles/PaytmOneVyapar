@@ -28,6 +28,28 @@ class NegotiationListController
         .list(cursor: current!.nextCursor);
     state = AsyncData(current.append(next, (item) => item.id));
   }
+
+  Future<NegotiationDetail> startNegotiation({
+    required String sku,
+    String? storeId,
+    num? quantity,
+    num? targetPrice,
+    num? maxPrice,
+    String? supplierId,
+  }) async {
+    final item = await ref
+        .read(negotiationRepositoryProvider)
+        .start(
+          sku: sku,
+          storeId: storeId,
+          quantity: quantity,
+          targetPrice: targetPrice,
+          maxPrice: maxPrice,
+          supplierId: supplierId,
+        );
+    await refresh();
+    return item;
+  }
 }
 
 final negotiationListProvider =

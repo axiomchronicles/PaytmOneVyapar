@@ -10,6 +10,9 @@ class ActivityItem {
     this.entityType,
     this.entityId,
     this.correlationId,
+    this.status,
+    this.messageId,
+    this.payload,
   });
 
   factory ActivityItem.fromA2A(JsonMap json) => ActivityItem(
@@ -27,6 +30,9 @@ class ActivityItem {
         jsonOptionalString(json['order_id']) ??
         jsonOptionalString(json['negotiation_id']),
     correlationId: jsonOptionalString(json['correlation_id']),
+    status: jsonOptionalString(json['status']),
+    messageId: jsonOptionalString(json['message_id']),
+    payload: json['payload'] is Map ? jsonMap(json['payload']) : null,
   );
 
   factory ActivityItem.fromBusiness(JsonMap json) => ActivityItem(
@@ -47,4 +53,7 @@ class ActivityItem {
   final String? entityType;
   final String? entityId;
   final String? correlationId;
+  final String? status;
+  final String? messageId;
+  final JsonMap? payload;
 }

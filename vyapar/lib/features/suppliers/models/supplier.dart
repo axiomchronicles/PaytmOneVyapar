@@ -45,6 +45,12 @@ class SupplierDetail {
     required this.isActive,
     required this.trustScore,
     required this.productCount,
+    this.phoneNumber,
+    this.gstin,
+    this.city,
+    this.state,
+    this.pincode,
+    this.category,
     this.products = const [],
   });
 
@@ -55,6 +61,12 @@ class SupplierDetail {
     isActive: jsonBool(json['is_active'], 'is_active'),
     trustScore: jsonNumber(json['trust_score'], 'trust_score').toDouble(),
     productCount: jsonNumber(json['product_count'], 'product_count').toInt(),
+    phoneNumber: jsonOptionalString(json['phone_number']),
+    gstin: jsonOptionalString(json['gstin']),
+    city: jsonOptionalString(json['city']),
+    state: jsonOptionalString(json['state']),
+    pincode: jsonOptionalString(json['pincode']),
+    category: jsonOptionalString(json['category']),
     products: json['products'] is List
         ? jsonList(json['products'])
               .map((item) => SupplierProduct.fromJson(jsonMap(item)))
@@ -68,5 +80,102 @@ class SupplierDetail {
   final bool isActive;
   final double trustScore;
   final int productCount;
+  final String? phoneNumber;
+  final String? gstin;
+  final String? city;
+  final String? state;
+  final String? pincode;
+  final String? category;
   final List<SupplierProduct> products;
+}
+
+class NearbySupplier {
+  const NearbySupplier({
+    required this.id,
+    required this.name,
+    this.city,
+    this.state,
+    this.pincode,
+    this.locality,
+    this.distanceKm,
+    this.trustScore = 0.95,
+    this.productCount = 0,
+    this.phoneNumber,
+    this.category,
+  });
+
+  factory NearbySupplier.fromJson(JsonMap json) => NearbySupplier(
+    id: jsonString(json['id'], 'id'),
+    name: jsonString(json['name'], 'name'),
+    city: jsonOptionalString(json['city']),
+    state: jsonOptionalString(json['state']),
+    pincode: jsonOptionalString(json['pincode']),
+    locality: jsonOptionalString(json['locality']),
+    distanceKm: json['distance_km'] != null
+        ? jsonNumber(json['distance_km'], 'distance_km').toDouble()
+        : null,
+    trustScore: json['trust_score'] != null
+        ? jsonNumber(json['trust_score'], 'trust_score').toDouble()
+        : 0.95,
+    productCount: json['product_count'] != null
+        ? jsonNumber(json['product_count'], 'product_count').toInt()
+        : 0,
+    phoneNumber: jsonOptionalString(json['phone_number']),
+    category: jsonOptionalString(json['category']),
+  );
+
+  final String id;
+  final String name;
+  final String? city;
+  final String? state;
+  final String? pincode;
+  final String? locality;
+  final double? distanceKm;
+  final double trustScore;
+  final int productCount;
+  final String? phoneNumber;
+  final String? category;
+}
+
+class NearbyMerchant {
+  const NearbyMerchant({
+    required this.id,
+    required this.name,
+    this.city,
+    this.state,
+    this.pincode,
+    this.locality,
+    this.distanceKm,
+    this.productCount = 0,
+    this.phoneNumber,
+    this.businessType = 'retail',
+  });
+
+  factory NearbyMerchant.fromJson(JsonMap json) => NearbyMerchant(
+    id: jsonString(json['id'], 'id'),
+    name: jsonString(json['name'], 'name'),
+    city: jsonOptionalString(json['city']),
+    state: jsonOptionalString(json['state']),
+    pincode: jsonOptionalString(json['pincode']),
+    locality: jsonOptionalString(json['locality']),
+    distanceKm: json['distance_km'] != null
+        ? jsonNumber(json['distance_km'], 'distance_km').toDouble()
+        : null,
+    productCount: json['product_count'] != null
+        ? jsonNumber(json['product_count'], 'product_count').toInt()
+        : 0,
+    phoneNumber: jsonOptionalString(json['phone_number']),
+    businessType: jsonOptionalString(json['business_type']) ?? 'retail',
+  );
+
+  final String id;
+  final String name;
+  final String? city;
+  final String? state;
+  final String? pincode;
+  final String? locality;
+  final double? distanceKm;
+  final int productCount;
+  final String? phoneNumber;
+  final String businessType;
 }

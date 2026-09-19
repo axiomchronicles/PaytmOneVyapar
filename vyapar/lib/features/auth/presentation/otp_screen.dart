@@ -9,17 +9,30 @@ import 'package:vyapar/design_system/tokens/spacing.dart';
 import 'package:vyapar/features/auth/providers/auth_provider.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
-  const OtpScreen({required this.registration, super.key});
+  const OtpScreen({
+    required this.registration,
+    this.role,
+    this.phone,
+    super.key,
+  });
 
   final bool registration;
+  final String? role;
+  final String? phone;
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
 class _OtpScreenState extends ConsumerState<OtpScreen> {
-  final _phone = TextEditingController();
+  late final TextEditingController _phone;
   final _otp = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _phone = TextEditingController(text: widget.phone ?? '');
+  }
 
   @override
   void dispose() {
@@ -33,7 +46,15 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       final needsRegistration = await ref
           .read(otpFlowProvider.notifier)
           .verify(value, phone: _phone.text);
-      if (mounted && needsRegistration) context.go('/register');
+      if (mounted && needsRegistration) {
+        if (widget.role == 'supplier') {
+          context.go('/register/supplier');
+        } else if (widget.role == 'merchant') {
+          context.go('/register/merchant');
+        } else {
+          context.go('/register');
+        }
+      }
     } on Object {
       // The provider error is rendered below.
     }

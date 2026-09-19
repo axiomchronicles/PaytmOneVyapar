@@ -9,6 +9,7 @@ import 'package:vyapar/design_system/components/app_text_field.dart';
 import 'package:vyapar/design_system/components/vyapar_logo.dart';
 import 'package:vyapar/design_system/icons/vyapar_icons.dart';
 import 'package:vyapar/design_system/tokens/colors.dart';
+import 'package:vyapar/design_system/tokens/radii.dart';
 import 'package:vyapar/design_system/tokens/spacing.dart';
 import 'package:vyapar/features/auth/providers/auth_provider.dart';
 import 'package:vyapar/l10n/app_localizations.dart';
@@ -206,11 +207,48 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       const SizedBox(height: AppSpacing.sm),
                       _SignInError(message: oauth.error.toString()),
                     ],
-                    AppButton(
-                      key: const ValueKey('create_account_button'),
-                      label: 'Create a business account',
-                      style: AppButtonStyle.text,
-                      onPressed: () => context.go('/otp?registration=true'),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                          ),
+                          child: Text(
+                            'Or Register New Account',
+                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _RegistrationOptionCard(
+                            key: const ValueKey('create_account_button'),
+                            icon: VyaparIcons.store,
+                            title: 'Merchant\nRegistration',
+                            subtitle: 'Kirana & Retail',
+                            onTap: () => context.go('/otp?registration=true&role=merchant'),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _RegistrationOptionCard(
+                            key: const ValueKey('supplier_registration_button'),
+                            icon: VyaparIcons.truck,
+                            title: 'Supplier\nRegistration',
+                            subtitle: 'Wholesale B2B',
+                            onTap: () => context.go('/otp?registration=true&role=supplier'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -221,6 +259,76 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       ],
     ),
   );
+  }
+}
+
+class _RegistrationOptionCard extends StatelessWidget {
+  const _RegistrationOptionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    super.key,
+  });
+
+  final List<List<dynamic>> icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.md,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.paleBlue,
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
+                  ),
+                  child: VyaparIcon(icon, size: 20, color: AppColors.navy),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.navy,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

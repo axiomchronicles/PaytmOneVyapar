@@ -51,8 +51,16 @@ class AuthController extends AsyncNotifier<AuthSession> {
       return const AuthSession.unauthenticated();
     }
     try {
-      await ref.watch(authRepositoryProvider).validateSession();
-      return const AuthSession.authenticated();
+      final userMe = await ref.watch(authRepositoryProvider).validateSession();
+      return AuthSession.authenticated(
+        role: userMe.role,
+        accountType: userMe.accountType,
+        businessName: userMe.businessName,
+        gstin: userMe.gstin,
+        pan: userMe.pan,
+        email: userMe.email,
+        phone: userMe.phoneNumber,
+      );
     } on AppFailure catch (failure) {
       if (failure.isUnauthorized) {
         await ref.read(tokenStoreProvider).clear();
@@ -68,7 +76,16 @@ class AuthController extends AsyncNotifier<AuthSession> {
       await ref
           .read(authRepositoryProvider)
           .signIn(email: email, password: password);
-      return const AuthSession.authenticated();
+      final userMe = await ref.read(authRepositoryProvider).validateSession();
+      return AuthSession.authenticated(
+        role: userMe.role,
+        accountType: userMe.accountType,
+        businessName: userMe.businessName,
+        gstin: userMe.gstin,
+        pan: userMe.pan,
+        email: userMe.email,
+        phone: userMe.phoneNumber,
+      );
     });
   }
 
@@ -77,7 +94,23 @@ class AuthController extends AsyncNotifier<AuthSession> {
     state = const AsyncData(AuthSession.unauthenticated());
   }
 
-  void authenticated() => state = const AsyncData(AuthSession.authenticated());
+  void authenticatedWithUser(UserMe user) => state = AsyncData(
+    AuthSession.authenticated(
+      role: user.role,
+      accountType: user.accountType,
+      businessName: user.businessName,
+      gstin: user.gstin,
+      pan: user.pan,
+      email: user.email,
+      phone: user.phoneNumber,
+    ),
+  );
+
+  /// Loads the authoritative role before routing an OTP/OAuth sign-in.
+  Future<void> authenticatedFromServer() async {
+    final user = await ref.read(authRepositoryProvider).validateSession();
+    authenticatedWithUser(user);
+  }
 
   Future<void> retryRestore() async => ref.invalidateSelf();
 }
@@ -118,7 +151,7 @@ class OtpFlowController extends AsyncNotifier<OtpChallenge?> {
         state = AsyncData(challenge);
         return true;
       }
-      ref.read(authControllerProvider.notifier).authenticated();
+      await ref.read(authControllerProvider.notifier).authenticatedFromServer();
       state = AsyncData(challenge);
       return false;
     } catch (error, stackTrace) {
@@ -174,7 +207,7 @@ class OAuthFlowController extends AsyncNotifier<void> {
         state = const AsyncData(null);
         return true;
       }
-      ref.read(authControllerProvider.notifier).authenticated();
+      await ref.read(authControllerProvider.notifier).authenticatedFromServer();
       state = const AsyncData(null);
       return false;
     } catch (error, stackTrace) {
@@ -197,6 +230,11 @@ class RegistrationController extends AsyncNotifier<void> {
     required String businessName,
     required String storeName,
     String? password,
+    String role = 'merchant',
+    String? gstin,
+    String? pan,
+    String? category,
+    Map<String, dynamic>? address,
   }) async {
     final pending = ref.read(pendingRegistrationProvider);
     if (pending == null) throw StateError('Verification is required.');
@@ -211,9 +249,15 @@ class RegistrationController extends AsyncNotifier<void> {
             registrationToken: pending.token,
             password: pending.oauth ? null : password,
             phone: pending.phone,
+            role: role,
+            gstin: gstin,
+            pan: pan,
+            category: category,
+            address: address,
           );
       ref.read(pendingRegistrationProvider.notifier).clear();
-      ref.read(authControllerProvider.notifier).authenticated();
+      final userMe = await ref.read(authRepositoryProvider).validateSession();
+      ref.read(authControllerProvider.notifier).authenticatedWithUser(userMe);
     });
   }
 }

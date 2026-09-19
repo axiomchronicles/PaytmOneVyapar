@@ -4,6 +4,7 @@ import 'package:vyapar/app/providers.dart';
 import 'package:vyapar/core/networking/cursor_page.dart';
 import 'package:vyapar/features/approvals/data/approval_repository.dart';
 import 'package:vyapar/features/approvals/models/approval_detail.dart';
+import 'package:vyapar/features/orders/providers/order_provider.dart';
 
 final approvalRepositoryProvider = Provider<ApprovalRepository>(
   (ref) => ApprovalRepository(ref.watch(dioProvider)),
@@ -101,6 +102,12 @@ class ApprovalController extends AsyncNotifier<ApprovalDetail> {
         await ref.read(approvalRepositoryProvider).get(_approvalId),
       );
       ref.invalidate(approvalListProvider);
+      // An approved proposal creates an order synchronously (or hands it to
+      // the supplier approval stage). Refresh the persistent Orders tab now.
+      ref.invalidate(orderListProvider);
+      if (result.orderId case final orderId?) {
+        ref.invalidate(orderDetailProvider(orderId));
+      }
       return result;
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);

@@ -64,3 +64,39 @@ class OAuthChallenge {
   final String nonce;
   final String clientId;
 }
+
+class UserMe {
+  const UserMe({
+    required this.userId,
+    required this.merchantId,
+    required this.role,
+    required this.accountType,
+    required this.email,
+    required this.businessName,
+    this.phoneNumber,
+    this.gstin,
+    this.pan,
+  });
+
+  factory UserMe.fromJson(JsonMap json) => UserMe(
+    userId: jsonString(json['user_id'], 'user_id'),
+    merchantId: jsonString(json['merchant_id'], 'merchant_id'),
+    role: jsonOptionalString(json['role']) ?? 'merchant',
+    accountType: jsonOptionalString(json['account_type']) ?? 'merchant',
+    email: jsonString(json['email'], 'email'),
+    businessName: jsonOptionalString(json['business_name']) ?? 'My Business',
+    phoneNumber: jsonOptionalString(json['phone_number']),
+    gstin: jsonOptionalString(json['gstin']),
+    pan: jsonOptionalString(json['pan']),
+  );
+
+  final String userId;
+  final String merchantId;
+  final String role;
+  final String accountType;
+  final String email;
+  final String businessName;
+  final String? phoneNumber;
+  final String? gstin;
+  final String? pan;
+}

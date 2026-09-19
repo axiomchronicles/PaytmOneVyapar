@@ -454,21 +454,23 @@ class _AajKaHaalSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = ref.watch(analyticsControllerProvider).value;
     final inventory = ref.watch(inventoryControllerProvider);
-    final expectedSettlement = analytics?.expectedSettlement ?? 17980.0;
+    final expectedSettlement = analytics?.expectedSettlement ?? 0.0;
     final lowCount = inventory.value?.where((item) => item.isLow).length;
     final firstLow = inventory.value?.where((item) => item.isLow).firstOrNull;
 
-    final signalSubtext = switch ((inventory.isLoading, lowCount)) {
-      (true, _) => 'Checking your shop now…',
-      (_, null) => 'Sirf 12 units bache hain. Is weekend demand 28% zyada rehne ki sambhaavna hai (38°C).',
-      (_, 0) => 'No inventory item is below its reorder point.',
-      (_, final count) =>
-        '$count inventory ${count == 1 ? 'item needs' : 'items need'} attention.',
-    };
+    final signalSubtext = analytics?.criticalAlert?.description ??
+        (switch ((inventory.isLoading, lowCount)) {
+          (true, _) => 'Checking your shop now…',
+          (_, null) => 'Reviewing stock health...',
+          (_, 0) => 'No inventory item is below its reorder point.',
+          (_, final count) =>
+            '$count inventory ${count == 1 ? 'item needs' : 'items need'} attention.',
+        });
 
-    final title = firstLow != null
-        ? '${firstLow.name} ka stock kal tak khatam ho sakta hai'
-        : 'Cold drinks ka stock kal tak khatam ho sakta hai';
+    final title = analytics?.criticalAlert?.title ??
+        (firstLow != null
+            ? '${firstLow.name} ka stock kal tak khatam ho sakta hai'
+            : 'Sabhi stock theek hain');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,7 +642,9 @@ class _AajKaHaalSection extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               InkWell(
-                onTap: () => context.push('/inventory'),
+                onTap: () => context.push(
+                  analytics?.criticalAlert?.actionUrl ?? '/inventory',
+                ),
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

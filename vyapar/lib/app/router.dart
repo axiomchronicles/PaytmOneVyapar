@@ -24,6 +24,7 @@ import 'package:vyapar/features/inventory/presentation/manual_inventory_screen.d
 import 'package:vyapar/features/inventory/presentation/receipt_review_screen.dart';
 import 'package:vyapar/features/inventory/presentation/receipt_scan_screen.dart';
 import 'package:vyapar/features/inventory/presentation/receipt_success_screen.dart';
+import 'package:vyapar/features/munim/presentation/munim_chat_screen.dart';
 import 'package:vyapar/features/munim/presentation/munim_screen.dart';
 import 'package:vyapar/features/negotiations/presentation/negotiation_detail_screen.dart';
 import 'package:vyapar/features/negotiations/presentation/negotiations_screen.dart';
@@ -38,7 +39,10 @@ import 'package:vyapar/features/settings/presentation/channels_screen.dart';
 import 'package:vyapar/features/settings/presentation/language_screen.dart';
 import 'package:vyapar/features/settings/presentation/more_screen.dart';
 import 'package:vyapar/features/settings/presentation/settings_screen.dart';
+import 'package:vyapar/features/suppliers/presentation/discovery_screen.dart';
 import 'package:vyapar/features/suppliers/presentation/supplier_detail_screen.dart';
+import 'package:vyapar/features/suppliers/presentation/supplier_home_screen.dart';
+import 'package:vyapar/features/suppliers/presentation/supplier_inventory_screen.dart';
 import 'package:vyapar/features/suppliers/presentation/suppliers_screen.dart';
 import 'package:vyapar/features/voice/presentation/voice_screen.dart';
 
@@ -53,12 +57,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return location == '/session-recovery' ? null : '/session-recovery';
       }
       final authenticated = auth.value?.isAuthenticated ?? false;
-      final publicRoute =
+      final isAuthRoute =
           location == '/welcome' ||
           location == '/sign-in' ||
           location == '/otp' ||
           location == '/register' ||
-          location == '/language';
+          location.startsWith('/register/');
+      final publicRoute = isAuthRoute || location == '/language';
       if (!authenticated) {
         return publicRoute
             ? null
@@ -67,17 +72,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 queryParameters: {'redirect': state.uri.toString()},
               ).toString();
       }
-      if (location == '/splash' ||
-          location == '/welcome' ||
-          location == '/sign-in') {
+      if (location == '/splash' || isAuthRoute) {
+        final isSupplier = auth.value?.isSupplier ?? false;
+        final defaultHome = isSupplier ? '/supplier-home' : '/home';
         final intended = state.uri.queryParameters['redirect'];
         return intended != null &&
                 intended.startsWith('/') &&
                 !intended.startsWith('//') &&
                 !intended.startsWith('/welcome') &&
-                !intended.startsWith('/sign-in')
+                !intended.startsWith('/sign-in') &&
+                !intended.startsWith('/otp') &&
+                !intended.startsWith('/register')
             ? intended
-            : '/home';
+            : defaultHome;
       }
       return null;
     },
@@ -100,11 +107,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/otp',
         builder: (context, state) => OtpScreen(
           registration: state.uri.queryParameters['registration'] == 'true',
+          role: state.uri.queryParameters['role'],
+          phone: state.uri.queryParameters['phone'],
         ),
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegistrationScreen(),
+        builder: (context, state) =>
+            RegistrationScreen(initialRole: state.uri.queryParameters['role']),
+      ),
+      GoRoute(
+        path: '/register/merchant',
+        builder: (context, state) => const MerchantRegistrationScreen(),
+      ),
+      GoRoute(
+        path: '/register/supplier',
+        builder: (context, state) => const SupplierRegistrationScreen(),
       ),
       GoRoute(
         path: '/language',
@@ -218,6 +236,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: '/munim/chat',
+        builder: (context, state) => const MunimChatScreen(),
+      ),
+      GoRoute(
         path: '/analytics/:metric',
         builder: (context, state) => AnalyticsDetailScreen(
           metric: AnalyticsMetric.values.byName(
@@ -228,6 +250,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/suppliers',
         builder: (context, state) => const SuppliersScreen(),
+      ),
+      GoRoute(
+        path: '/suppliers/discovery',
+        builder: (context, state) =>
+            const DiscoveryScreen(isMerchantSearch: false),
+      ),
+      GoRoute(
+        path: '/suppliers/merchants',
+        builder: (context, state) =>
+            const DiscoveryScreen(isMerchantSearch: true),
       ),
       GoRoute(
         path: '/suppliers/:supplierId',
@@ -278,6 +310,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/more/capabilities',
         builder: (context, state) => const CapabilitiesScreen(),
+      ),
+      GoRoute(
+        path: '/supplier-home',
+        builder: (context, state) => const SupplierHomeScreen(),
+      ),
+      GoRoute(
+        path: '/supplier-home/inventory',
+        builder: (context, state) => const SupplierInventoryScreen(),
+      ),
+      GoRoute(
+        path: '/supplier-home/inventory/add',
+        builder: (context, state) => const SupplierInventoryFormScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

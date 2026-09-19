@@ -5,13 +5,17 @@ import 'package:vyapar/app/providers.dart';
 import 'package:vyapar/design_system/components/states.dart';
 import 'package:vyapar/design_system/icons/vyapar_icons.dart';
 import 'package:vyapar/design_system/tokens/colors.dart';
+import 'package:vyapar/features/orders/providers/order_provider.dart';
 
 class AppShell extends ConsumerWidget {
   const AppShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
-  void _goBranch(int index) {
+  void _goBranch(int index, WidgetRef ref) {
+    if (index == 3) {
+      ref.invalidate(orderListProvider);
+    }
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -47,7 +51,7 @@ class AppShell extends ConsumerWidget {
                 SafeArea(
                   child: NavigationRail(
                     selectedIndex: navigationShell.currentIndex,
-                    onDestinationSelected: _goBranch,
+                    onDestinationSelected: (index) => _goBranch(index, ref),
                     labelType: constraints.maxWidth >= 920
                         ? NavigationRailLabelType.all
                         : NavigationRailLabelType.selected,
@@ -78,7 +82,7 @@ class AppShell extends ConsumerWidget {
           body: content,
           bottomNavigationBar: NavigationBar(
             selectedIndex: navigationShell.currentIndex,
-            onDestinationSelected: _goBranch,
+            onDestinationSelected: (index) => _goBranch(index, ref),
             backgroundColor: AppColors.surface,
             indicatorColor: Colors.transparent,
             destinations: [

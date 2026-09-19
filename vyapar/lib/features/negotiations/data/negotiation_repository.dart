@@ -32,4 +32,30 @@ class NegotiationRepository {
       throw mapApiError(error);
     }
   }
+
+  Future<NegotiationDetail> start({
+    required String sku,
+    String? storeId,
+    num? quantity,
+    num? targetPrice,
+    num? maxPrice,
+    String? supplierId,
+  }) async {
+    try {
+      final response = await _dio.post<Object?>(
+        '/negotiations/start',
+        data: {
+          'sku': sku,
+          if (supplierId != null) 'supplier_id': supplierId,
+          if (storeId != null) 'store_id': storeId,
+          if (quantity != null) 'quantity': quantity,
+          if (targetPrice != null) 'target_price': targetPrice,
+          if (maxPrice != null) 'max_price': maxPrice,
+        },
+      );
+      return NegotiationDetail.fromJson(jsonMap(response.data));
+    } catch (error) {
+      throw mapApiError(error);
+    }
+  }
 }

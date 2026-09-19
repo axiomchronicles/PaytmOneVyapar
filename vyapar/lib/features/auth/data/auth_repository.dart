@@ -30,9 +30,23 @@ class AuthRepository {
     }
   }
 
-  Future<void> validateSession() async {
+  Future<UserMe> validateSession() async {
     try {
-      await _dio.get<Object?>('/merchants/me');
+      try {
+        final response = await _dio.get<Object?>('/auth/me');
+        return UserMe.fromJson(jsonMap(response.data));
+      } on Object {
+        final response = await _dio.get<Object?>('/merchants/me');
+        final data = jsonMap(response.data);
+        return UserMe(
+          userId: jsonString(data['id'], 'id'),
+          merchantId: jsonString(data['id'], 'id'),
+          role: 'merchant',
+          accountType: 'merchant',
+          email: 'merchant@vyapaar.local',
+          businessName: jsonOptionalString(data['name']) ?? 'My Business',
+        );
+      }
     } catch (error) {
       throw mapApiError(error);
     }
@@ -92,6 +106,11 @@ class AuthRepository {
     required String registrationToken,
     String? password,
     String? phone,
+    String role = 'merchant',
+    String? gstin,
+    String? pan,
+    String? category,
+    Map<String, dynamic>? address,
   }) async {
     try {
       final response = await _dio.post<Object?>(
@@ -101,8 +120,16 @@ class AuthRepository {
           'business_name': businessName.trim(),
           'store_name': storeName.trim(),
           'registration_token': registrationToken,
+          'role': role,
           if (password != null) 'password': password,
           if (phone != null) 'phone_number': phone,
+          if (gstin != null && gstin.trim().isNotEmpty)
+            'gstin': gstin.trim().toUpperCase(),
+          if (pan != null && pan.trim().isNotEmpty)
+            'pan': pan.trim().toUpperCase(),
+          if (category != null && category.trim().isNotEmpty)
+            'category': category.trim(),
+          if (address != null) 'address': address,
         },
       );
       await _saveTokens(jsonMap(response.data));

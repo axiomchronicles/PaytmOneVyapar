@@ -2,6 +2,23 @@ import 'package:dio/dio.dart';
 import 'package:vyapar/core/errors/app_failure.dart';
 import 'package:vyapar/core/networking/json.dart';
 
+String? _validationMessage(JsonMap? envelope) {
+  final details = envelope?['details'];
+  if (details is! Map || details['errors'] is! List) return null;
+
+  for (final error in details['errors'] as List) {
+    if (error is! Map) continue;
+    final message = jsonOptionalString(error['msg']);
+    if (message == null || message.isEmpty) continue;
+    final location = error['loc'];
+    final field = location is List
+        ? location.whereType<String>().where((part) => part != 'body').join('.')
+        : '';
+    return field.isEmpty ? message : '$field: $message';
+  }
+  return null;
+}
+
 AppFailure mapApiError(Object error) {
   if (error is AppFailure) return error;
   if (error is DioException) {
@@ -39,6 +56,7 @@ AppFailure mapApiError(Object error) {
     }
     final code = jsonOptionalString(envelope?['code']);
     final message =
+        (status == 422 ? _validationMessage(envelope) : null) ??
         jsonOptionalString(envelope?['message']) ??
         (serverFailure
             ? 'Vyapar is temporarily unavailable.'

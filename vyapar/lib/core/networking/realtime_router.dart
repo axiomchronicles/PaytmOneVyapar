@@ -23,6 +23,7 @@ abstract final class RealtimeEventRouter {
     },
     'APPROVAL_REQUIRED' || 'APPROVAL_GRANTED' || 'APPROVAL_REJECTED' => {
       RealtimeTarget.approvals,
+      RealtimeTarget.orders,
       RealtimeTarget.notifications,
     },
     'ORDER_EXECUTED' || 'ORDER_FAILED' || 'SUPPLIER_CONFIRMATION_RECEIVED' => {
