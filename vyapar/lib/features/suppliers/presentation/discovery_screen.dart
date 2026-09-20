@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vyapar/core/auth/auth_session.dart';
 import 'package:vyapar/design_system/components/app_header.dart';
 import 'package:vyapar/design_system/components/states.dart';
 import 'package:vyapar/design_system/icons/vyapar_icons.dart';
-import 'package:vyapar/design_system/tokens/colors.dart';
 import 'package:vyapar/design_system/tokens/spacing.dart';
 import 'package:vyapar/features/auth/providers/auth_provider.dart';
 import 'package:vyapar/features/suppliers/models/supplier.dart';
@@ -22,7 +20,6 @@ class DiscoveryScreen extends ConsumerStatefulWidget {
 
 class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
   final _searchController = TextEditingController();
-  String _filterCity = '';
 
   @override
   void dispose() {

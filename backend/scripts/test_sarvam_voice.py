@@ -42,14 +42,12 @@ from app.agents.services import (
     WorkflowServices,
 )
 from app.channels.voice.agent import VoiceMunimAgent
-from app.channels.voice.i18n import get_voice_message
 from app.channels.voice.pipeline import VoicePipeline
-from app.channels.voice.protocol import VoiceEvent, VoiceEventType, VoiceIntentType
+from app.channels.voice.protocol import VoiceEvent, VoiceEventType
 from app.channels.voice.provider import VoiceProvider
 from app.channels.voice.sarvam import SarvamVoiceProvider
 from app.channels.voice.session import VoiceSession
 from app.core.config import get_settings
-from app.domain.enums import ApprovalStatus
 from app.integrations.llm import build_llm_provider
 from app.integrations.suppliers.mock_supplier import MockSupplierAdapter
 from app.ml.demand.baseline import BaselineForecaster
@@ -303,6 +301,7 @@ async def run_scenario_for_language(
     merchant_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
     user_id = UUID("99999999-9999-4999-8999-999999999999")
 
+    settings = get_settings()
     llm = build_llm_provider(settings)
     munim_agent = VoiceMunimAgent(llm_provider=llm, workflow_runtime=runtime)
     handle_voice_action = munim_agent.handle

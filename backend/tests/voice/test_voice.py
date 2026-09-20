@@ -1,5 +1,18 @@
+import re
+from uuid import uuid4
+
+import pytest
+
+from app.channels.voice.agent import VoiceMunimAgent
 from app.channels.voice.pipeline import extract_voice_intent
 from app.channels.voice.protocol import VoiceIntentType
+from app.channels.voice.sarvam import (
+    clean_text_for_natural_voice,
+    normalize_stt_language,
+    resolve_target_language,
+    sanitize_urdu_to_hindi,
+)
+from app.channels.voice.session import VoiceSession
 from app.channels.whatsapp.approval_handler import (
     WhatsAppApprovalAction,
     parse_approval_callback,
@@ -38,13 +51,6 @@ def test_conversational_intents_recognized() -> None:
     assert inv.intent == VoiceIntentType.QUERY_INVENTORY
     assert proposals.intent == VoiceIntentType.QUERY_PROPOSALS
     assert general.intent == VoiceIntentType.GENERAL_QUERY
-
-
-import pytest
-from uuid import uuid4
-from app.channels.voice.agent import VoiceMunimAgent
-from app.channels.voice.sarvam import clean_text_for_natural_voice
-from app.channels.voice.session import VoiceSession
 
 
 @pytest.mark.asyncio
@@ -116,14 +122,6 @@ async def test_voice_munim_agent_gracefully_falls_back_on_llm_failure() -> None:
     assert "safe business action" not in reply
     assert "सुरक्षित व्यावसायिक कार्य" not in reply
     assert len(session.history) == 2
-
-
-from app.channels.voice.sarvam import (
-    normalize_stt_language,
-    resolve_target_language,
-    sanitize_urdu_to_hindi,
-)
-import re
 
 
 def test_sanitize_urdu_to_hindi_converts_nastaliq() -> None:

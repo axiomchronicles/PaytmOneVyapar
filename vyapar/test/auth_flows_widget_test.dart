@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:vyapar/core/auth/auth_session.dart';
 import 'package:vyapar/core/auth/auth_storage.dart';
 import 'package:vyapar/core/auth/token_store.dart';
@@ -12,7 +12,6 @@ import 'package:vyapar/features/auth/data/oauth_client.dart';
 import 'package:vyapar/features/auth/models/auth_models.dart';
 import 'package:vyapar/features/auth/presentation/otp_screen.dart';
 import 'package:vyapar/features/auth/presentation/registration_screen.dart';
-import 'package:vyapar/app/router.dart';
 import 'package:vyapar/features/auth/presentation/sign_in_screen.dart';
 import 'package:vyapar/features/auth/providers/auth_provider.dart';
 import 'package:vyapar/l10n/app_localizations.dart';

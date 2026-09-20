@@ -3,14 +3,12 @@ from typing import Any
 from uuid import UUID
 
 import structlog
-from sqlalchemy import func, select
 
 from app.channels.voice.i18n import get_voice_message
 from app.channels.voice.protocol import VoiceIntent, VoiceIntentType
 from app.channels.voice.sarvam import clean_text_for_natural_voice, sanitize_urdu_to_hindi
 from app.channels.voice.session import VoiceSession
 from app.domain.enums import ApprovalStatus
-from app.infrastructure.db.models import Approval, Inventory, Merchant, Product
 from app.integrations.llm.base import DisabledLLMProvider
 
 logger = structlog.get_logger()

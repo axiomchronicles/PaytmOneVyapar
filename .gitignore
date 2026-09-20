@@ -1,20 +1,77 @@
-# Python
+# ── Environment & Secrets ───────────────────────────────────────────────────
 .env
+.env.*
+!.env.example
+!backend/.env.example
+!deploy/.env.example
+
+# ── Python / uv / Pytest ────────────────────────────────────────────────────
 .venv/
 __pycache__/
 *.py[cod]
+*$py.class
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 .coverage
 htmlcov/
 dist/
+build/
 *.egg-info/
 
-# Operating System
+# ── Flutter & Dart ──────────────────────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+vyapar/build/
+ephemeral/
+
+# ── Android ─────────────────────────────────────────────────────────────────
+vyapar/android/.gradle/
+vyapar/android/local.properties
+vyapar/android/captures/
+vyapar/android/app/build/
+vyapar/android/app/release/
+vyapar/android/app/debug/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# ── iOS / macOS ─────────────────────────────────────────────────────────────
+vyapar/ios/Pods/
+vyapar/macos/Pods/
+vyapar/ios/.symlinks/
+vyapar/macos/.symlinks/
+*.mode1v3
+*.mode2v3
+*.normal
+*.perspectivev3
+*.pbxuser
+*.xcworkspace/xcuserdata/
+*.xcuserdatad/
+DerivedData/
+
+# ── Logs & Debug ────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── OS & Editors ────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
+# ── Local Agent Cache ───────────────────────────────────────────────────────
 .agents/
 .claude/
+skills-lock.json
 
+# ── Archives ────────────────────────────────────────────────────────────────
 design_reference/*.zip

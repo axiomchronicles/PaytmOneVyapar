@@ -390,7 +390,7 @@ class _StartNegotiationSheetState
 
       if (mounted) {
         Navigator.of(context).pop();
-        context.push('/negotiations/${result.id}');
+        await context.push('/negotiations/${result.id}');
       }
     } catch (e) {
       if (mounted) {

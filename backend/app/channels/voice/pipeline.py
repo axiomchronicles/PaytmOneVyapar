@@ -1,4 +1,3 @@
-import asyncio
 import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 
